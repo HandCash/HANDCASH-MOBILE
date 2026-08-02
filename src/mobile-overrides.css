@@ -1,4 +1,4 @@
-/* Full Desktop UI — phone shell tweaks only */
+/* Full Desktop UI — phone shell + floating RN-style tab bar */
 
 html.platform-mobile,
 html.platform-mobile body {
@@ -21,10 +21,272 @@ html.platform-mobile .nav-section-body {
 }
 
 html.platform-mobile .aeonToast__viewport {
-  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
 }
 
-/* Prefer stacked nav on narrow phones */
+/* ── Dashboard: hero → compact BSV row → content ── */
+html.platform-mobile .dashboard {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 100%;
+  gap: 8px;
+  overflow: hidden;
+  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+}
+
+html.platform-mobile .dashboard-main,
+html.platform-mobile .dashboard-side {
+  display: contents;
+}
+
+html.platform-mobile .dashboard-side > .history-panel {
+  display: none;
+}
+
+html.platform-mobile .wallet-hero {
+  order: 1;
+  flex-shrink: 0;
+}
+
+/* Balance on its own line; actions below */
+html.platform-mobile .wallet-hero-main {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+html.platform-mobile .wallet-balance-slot {
+  width: 100%;
+  max-width: none;
+  justify-content: center;
+}
+
+html.platform-mobile .wallet-balance {
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  white-space: normal;
+  width: 100%;
+}
+
+html.platform-mobile .wallet-balance .balance,
+html.platform-mobile .wallet-balance .balance-secondary {
+  white-space: nowrap;
+}
+
+html.platform-mobile .wallet-actions {
+  width: 100%;
+  justify-content: center;
+  flex-wrap: nowrap;
+}
+
+html.platform-mobile .what-is-bsv {
+  order: 2;
+  flex: 0 0 auto;
+  min-height: 0 !important;
+  height: auto !important;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+html.platform-mobile .wallet-nav-shell {
+  order: 3;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  /* content panel only — tab bar floats outside */
+  overflow: hidden;
+}
+
+html.platform-mobile .wallet-nav {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+html.platform-mobile .wallet-nav-stage {
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 8px;
+}
+
+/* Compact BSV ticker: logo/name | sparkline | price */
+html.platform-mobile .what-is-bsv .bsv-asset-row {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 42%;
+  gap: 8px;
+  order: 1;
+}
+
+html.platform-mobile .what-is-bsv .bsv-logo-btn,
+html.platform-mobile .what-is-bsv .bsv-logo-stack,
+html.platform-mobile .what-is-bsv .bsv-logo,
+html.platform-mobile .what-is-bsv .bsv-logo-skeleton {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+html.platform-mobile .what-is-bsv .bsv-asset-text strong {
+  font-size: 0.78rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html.platform-mobile .what-is-bsv .bsv-change {
+  font-size: 0.68rem;
+}
+
+html.platform-mobile .what-is-bsv .bsv-stage {
+  display: block !important;
+  order: 2;
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 56px;
+  min-height: 28px;
+  height: 28px;
+  margin: 0 4px;
+}
+
+html.platform-mobile .what-is-bsv .bsv-stage-panel {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: none;
+  transition: opacity 160ms ease;
+  overflow: hidden;
+}
+
+html.platform-mobile .what-is-bsv .bsv-stage[data-aeon-state~='chart'] .bsv-stage-chart {
+  opacity: 1;
+  pointer-events: none;
+}
+
+html.platform-mobile .what-is-bsv .bsv-stage-about {
+  display: none !important;
+}
+
+html.platform-mobile .what-is-bsv .bsv-spark,
+html.platform-mobile .what-is-bsv .bsv-spark-empty {
+  width: 100%;
+  height: 28px;
+  margin: 0;
+}
+
+html.platform-mobile .what-is-bsv .bsv-price,
+html.platform-mobile .what-is-bsv .bsv-price-skeleton {
+  order: 3;
+  margin: 0;
+  flex-shrink: 0;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+}
+
+html.platform-mobile .what-is-bsv .bsv-about {
+  display: none !important;
+}
+
+/* ── Floating bottom tab bar (outside panel, near full-width) ── */
+html.platform-mobile .wallet-nav-bar {
+  position: fixed;
+  left: 6px;
+  right: 6px;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  box-sizing: border-box;
+  padding: 6px 6px;
+  border: 1px solid color-mix(in srgb, hsl(var(--border)) 80%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, #0c1210 88%, transparent);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  overflow: hidden;
+  scroll-snap-type: none;
+}
+
+html.platform-mobile .wallet-nav-bar-track {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  gap: 2px;
+  justify-content: stretch;
+  align-items: stretch;
+}
+
+html.platform-mobile .wallet-nav-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  padding: 8px 2px;
+  border-radius: 12px;
+  scroll-snap-align: none;
+}
+
+html.platform-mobile .wallet-nav-tab svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Icon-only tabs; short label only on the selected one */
+html.platform-mobile .wallet-nav-tab-label,
+html.platform-mobile .wallet-nav-tab-label-short {
+  display: none;
+}
+
+html.platform-mobile .wallet-nav-tab.is-active .wallet-nav-tab-label-short,
+html.platform-mobile .wallet-nav-tab[aria-selected='true'] .wallet-nav-tab-label-short,
+html.platform-mobile .wallet-nav-tab[data-selected] .wallet-nav-tab-label-short {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--hc-display);
+  font-size: 0.58rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+html.platform-mobile .wallet-nav-tab:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+html.platform-mobile .wallet-nav-tab.is-active,
+html.platform-mobile .wallet-nav-tab[aria-selected='true'],
+html.platform-mobile .wallet-nav-tab[data-selected] {
+  flex: 1.25 1 0;
+  color: var(--hc-accent);
+  background: color-mix(in srgb, var(--hc-accent) 12%, transparent);
+}
+
+html.platform-mobile .wallet-nav-tab.is-active::after,
+html.platform-mobile .wallet-nav-tab[aria-selected='true']::after,
+html.platform-mobile .wallet-nav-tab[data-selected]::after {
+  content: none;
+}
+
 @media (max-width: 640px) {
   html.platform-mobile .auth-screen {
     padding-left: 1rem;

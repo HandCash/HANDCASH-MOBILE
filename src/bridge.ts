@@ -1,7 +1,35 @@
 /**
- * Capacitor / browser stand-in for Electron `window.handcash`.
- * Durable prefs use localStorage (same fallback Desktop uses without Electron).
+ * Capacitor stand-in for Electron `window.handcash`.
+ * BRC-100 presence: native localhost :3321 (see Brc100LocalBridgePlugin) + JS wiring.
  */
+
+import {
+  onNativeBrc100Request,
+  respondNativeBrc100,
+  startNativeBrc100Bridge,
+  stopNativeBrc100Bridge,
+} from './brc100LocalBridge'
+
+type BridgeStatus = {
+  online: boolean
+  httpsUrl: string
+  httpUrl: string
+  error: string | null
+}
+
+type HttpRequestEvent = {
+  method: string
+  path: string
+  headers: Record<string, string>
+  body: string
+  request_id: number
+}
+
+type HttpResponseEvent = {
+  request_id: number
+  status: number
+  body: string
+}
 
 type UpdateStatus = {
   phase: 'idle' | 'not-available' | 'error'
@@ -15,6 +43,20 @@ type UpdateStatus = {
 
 const VERSION = '0.1.0-mobile'
 
+let bridgeStatus: BridgeStatus = {
+  online: false,
+  httpsUrl: '',
+  httpUrl: '',
+  error: 'Starting BRC-100 bridge…',
+}
+
+const bridgeListeners = new Set<(status: BridgeStatus) => void>()
+const httpListeners = new Set<(event: HttpRequestEvent) => void>()
+
+function emitBridge() {
+  for (const l of bridgeListeners) l(bridgeStatus)
+}
+
 function idleUpdate(): UpdateStatus {
   return {
     phase: 'not-available',
@@ -22,7 +64,7 @@ function idleUpdate(): UpdateStatus {
     currentVersion: VERSION,
     availableVersion: null,
     percent: null,
-    error: 'Updates are managed via the app store / sideload APK',
+    error: 'Updates are managed via sideload APK',
     canInstall: false,
   }
 }
@@ -34,6 +76,20 @@ function detectPlatform(): string {
   return 'web'
 }
 
+/** Advertise wallet presence to pages running inside this WebView. */
+function injectWebViewWalletHint(): void {
+  try {
+    ;(window as unknown as { __HANDCASH_BRC100__?: boolean }).__HANDCASH_BRC100__ = true
+    ;(window as unknown as { handcashBrc100?: { present: boolean; httpUrl: string } }).handcashBrc100 =
+      {
+        present: bridgeStatus.online,
+        httpUrl: bridgeStatus.httpUrl || 'http://127.0.0.1:3321',
+      }
+  } catch {
+    // ignore
+  }
+}
+
 export function installMobileBridge(): void {
   if (window.handcash) return
 
@@ -43,21 +99,47 @@ export function installMobileBridge(): void {
     platform,
     getAppInfo: async () => ({
       version: VERSION,
-      name: 'HandCash',
+      name: 'HandCash Mobile',
       isPackaged: true,
       platform,
     }),
-    getBridgeStatus: async () => ({
-      online: false,
-      httpsUrl: '',
-      httpUrl: '',
-      error: 'BRC-100 local bridge is Desktop-only in this build',
-    }),
-    restartBridge: async () => handcash.getBridgeStatus(),
-    onBridgeStatus: () => () => undefined,
-    onHttpRequest: () => () => undefined,
+    getBridgeStatus: async () => bridgeStatus,
+    restartBridge: async () => {
+      await stopNativeBrc100Bridge()
+      const httpUrl = await startNativeBrc100Bridge()
+      bridgeStatus = httpUrl
+        ? { online: true, httpsUrl: '', httpUrl, error: null }
+        : {
+            online: false,
+            httpsUrl: '',
+            httpUrl: '',
+            error: 'Could not start local BRC-100 bridge',
+          }
+      injectWebViewWalletHint()
+      emitBridge()
+      return bridgeStatus
+    },
+    onBridgeStatus: (handler: (status: BridgeStatus) => void) => {
+      bridgeListeners.add(handler)
+      handler(bridgeStatus)
+      return () => {
+        bridgeListeners.delete(handler)
+      }
+    },
+    onHttpRequest: (handler: (event: HttpRequestEvent) => void) => {
+      httpListeners.add(handler)
+      return () => {
+        httpListeners.delete(handler)
+      }
+    },
     onHttpRequestCancelled: () => () => undefined,
-    respondHttp: () => undefined,
+    respondHttp: (response: HttpResponseEvent) => {
+      void respondNativeBrc100({
+        requestId: response.request_id,
+        status: response.status,
+        body: response.body,
+      })
+    },
     focusWindow: async () => undefined,
     openExternal: async (url: string) => {
       window.open(url, '_blank', 'noopener,noreferrer')
@@ -67,7 +149,7 @@ export function installMobileBridge(): void {
     uploadLogs: async () => ({ ok: false as const, error: 'Log upload is Desktop-only' }),
     startDeviceLink: async () => ({
       ok: false as const,
-      error: 'Embedded QR link does not need a LAN host on mobile',
+      error: 'Use embedded QR link on mobile',
     }),
     stopDeviceLink: async () => ({ ok: true as const }),
     storageGetSync: (key: string) => {
@@ -77,7 +159,7 @@ export function installMobileBridge(): void {
         return null
       }
     },
-    storageSetSync: (key: string, value: string) => {
+    storageSetSync: (key: string, value: string, _opts?: { allowVaultIdentityReplace?: boolean }) => {
       try {
         if (value === '') localStorage.removeItem(key)
         else localStorage.setItem(key, value)
@@ -117,4 +199,33 @@ export function installMobileBridge(): void {
     writable: false,
     configurable: true,
   })
+
+  // Native → JS BRC-100 requests (same path Desktop uses via Electron IPC).
+  onNativeBrc100Request((native) => {
+    const event: HttpRequestEvent = {
+      method: native.method,
+      path: native.path,
+      headers: native.headers ?? {},
+      body: native.body ?? '',
+      request_id: native.requestId,
+    }
+    for (const l of httpListeners) l(event)
+  })
+
+  void (async () => {
+    const httpUrl = await startNativeBrc100Bridge()
+    bridgeStatus = httpUrl
+      ? { online: true, httpsUrl: '', httpUrl, error: null }
+      : {
+          online: false,
+          httpsUrl: '',
+          httpUrl: '',
+          error:
+            platform === 'web'
+              ? 'Native BRC-100 bridge requires the Android app'
+              : 'Could not bind http://127.0.0.1:3321',
+        }
+    injectWebViewWalletHint()
+    emitBridge()
+  })()
 }

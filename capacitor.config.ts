@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'io.handcash.mobile',
-  appName: 'HandCash',
+  appName: 'HandCash Mobile',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
