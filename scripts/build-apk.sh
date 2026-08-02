@@ -60,15 +60,31 @@ npm run build
 npx cap add android 2>/dev/null || true
 npx cap sync android
 
-# Cleartext LAN pairing + camera
+# Restore tracked native plugins (android/ is gitignored).
+NATIVE_SRC="$ROOT/native-android"
+NATIVE_DST="$ROOT/android/app/src/main/java/io/handcash/mobile"
+if [[ -d "$NATIVE_SRC" && -d "$NATIVE_DST" ]]; then
+  mkdir -p "$NATIVE_DST"
+  cp -f "$NATIVE_SRC"/*.java "$NATIVE_DST/" 2>/dev/null || true
+fi
+
+# Cleartext LAN pairing + camera + biometrics
 MANIFEST="$ROOT/android/app/src/main/AndroidManifest.xml"
 if [[ -f "$MANIFEST" ]]; then
   if ! grep -q 'android.permission.CAMERA' "$MANIFEST"; then
     perl -i -0pe 's|<manifest([^>]*)>|<manifest$1>\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />|' "$MANIFEST"
   fi
+  if ! grep -q 'USE_BIOMETRIC' "$MANIFEST"; then
+    perl -i -0pe 's|(<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />)|$1\n    <uses-permission android:name="android.permission.USE_BIOMETRIC" />\n    <uses-permission android:name="android.permission.USE_FINGERPRINT" />|' "$MANIFEST"
+  fi
   if ! grep -q 'usesCleartextTraffic' "$MANIFEST"; then
     perl -i -pe 's|<application|<application android:usesCleartextTraffic="true"|' "$MANIFEST"
   fi
+fi
+
+GRADLE="$ROOT/android/app/build.gradle"
+if [[ -f "$GRADLE" ]] && ! grep -q 'androidx.biometric:biometric' "$GRADLE"; then
+  perl -i -pe 's|(implementation "androidx.core:core-splashscreen:[^"]+")|$1\n    implementation "androidx.biometric:biometric:1.1.0"|' "$GRADLE"
 fi
 
 (

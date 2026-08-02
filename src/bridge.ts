@@ -9,6 +9,12 @@ import {
   startNativeBrc100Bridge,
   stopNativeBrc100Bridge,
 } from './brc100LocalBridge'
+import {
+  nativeDeviceAuthClear,
+  nativeDeviceAuthEnroll,
+  nativeDeviceAuthStatus,
+  nativeDeviceAuthUnlock,
+} from './deviceAuthNative'
 
 type BridgeStatus = {
   online: boolean
@@ -168,8 +174,19 @@ export function installMobileBridge(): void {
         return false
       }
     },
-    safeStorageAvailable: async () => false,
+    safeStorageAvailable: async () => {
+      const status = await nativeDeviceAuthStatus()
+      return status.available
+    },
+    deviceAuthStatus: () => nativeDeviceAuthStatus(),
+    deviceAuthEnroll: (password: string) => nativeDeviceAuthEnroll(password),
+    deviceAuthUnlock: (reason?: string) => nativeDeviceAuthUnlock(reason),
+    deviceAuthClear: async () => {
+      await nativeDeviceAuthClear()
+      return { ok: true as const }
+    },
     wipeWalletStorage: async () => {
+      await nativeDeviceAuthClear()
       const keys: string[] = []
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i)
