@@ -29,6 +29,8 @@ export default defineConfig({
       '@bsv/sdk',
       '@bsv/wallet-toolbox-client',
       'html5-qrcode',
+      '@zxing/browser',
+      '@zxing/library',
       'qrcode',
     ],
   },

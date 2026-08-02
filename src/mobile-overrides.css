@@ -333,14 +333,14 @@ html.platform-mobile .wallet-nav-tab[data-selected]::after {
   }
 
   html.platform-mobile .qr-scanner {
-    max-width: min(100%, 360px);
+    max-width: min(100%, 420px);
   }
 
   html.platform-mobile .link-device-qr img {
-    max-width: min(100%, 280px);
+    max-width: min(100%, 360px);
   }
 
   html.platform-mobile .qr-scanner-view {
-    min-height: 300px;
+    min-height: 320px;
   }
 }
