@@ -52,36 +52,75 @@ html.platform-mobile .wallet-hero {
   flex-shrink: 0;
 }
 
-/* Balance on its own line; actions below */
+/* Balance on its own line; actions below with labels */
 html.platform-mobile .wallet-hero-main {
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
+  gap: 12px;
+  overflow: visible;
 }
 
 html.platform-mobile .wallet-balance-slot {
+  flex: 0 0 auto;
   width: 100%;
   max-width: none;
+  min-height: 2.75rem;
   justify-content: center;
+  overflow: visible;
 }
 
 html.platform-mobile .wallet-balance {
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  white-space: normal;
-  width: 100%;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 0.4em;
+  white-space: nowrap;
+  width: max-content;
+  max-width: 100%;
+  font-size: 26px;
+  line-height: 1.15;
+  /* Defeat FitSlot scale that can shrink amounts away on narrow phones */
+  transform: none !important;
 }
 
-html.platform-mobile .wallet-balance .balance,
-html.platform-mobile .wallet-balance .balance-secondary {
+html.platform-mobile .wallet-balance .balance {
+  font-size: 1em;
   white-space: nowrap;
 }
 
+html.platform-mobile .wallet-balance .balance-secondary {
+  font-size: 0.55em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 html.platform-mobile .wallet-actions {
+  flex: 0 0 auto;
   width: 100%;
-  justify-content: center;
+  justify-content: space-between;
   flex-wrap: nowrap;
+  gap: 4px;
+}
+
+html.platform-mobile .wallet-actions .btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+html.platform-mobile .wallet-actions .btn-icon {
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 4px;
+}
+
+html.platform-mobile .wallet-action-label {
+  display: block !important;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700;
+  line-height: 1.1;
 }
 
 html.platform-mobile .what-is-bsv {
@@ -293,8 +332,15 @@ html.platform-mobile .wallet-nav-tab[data-selected]::after {
     padding-right: 1rem;
   }
 
-  html.platform-mobile .qr-scanner,
+  html.platform-mobile .qr-scanner {
+    max-width: min(100%, 360px);
+  }
+
   html.platform-mobile .link-device-qr img {
     max-width: min(100%, 280px);
+  }
+
+  html.platform-mobile .qr-scanner-view {
+    min-height: 300px;
   }
 }
