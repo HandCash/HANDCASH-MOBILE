@@ -1,0 +1,38 @@
+/* Full Desktop UI — phone shell tweaks only */
+
+html.platform-mobile,
+html.platform-mobile body {
+  overscroll-behavior: none;
+}
+
+html.platform-mobile .app-shell {
+  min-height: 100dvh;
+  min-height: 100svh;
+}
+
+html.platform-mobile .titlebar {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+html.platform-mobile .wallet-nav-stage,
+html.platform-mobile .settings-scroll,
+html.platform-mobile .nav-section-body {
+  -webkit-overflow-scrolling: touch;
+}
+
+html.platform-mobile .aeonToast__viewport {
+  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Prefer stacked nav on narrow phones */
+@media (max-width: 640px) {
+  html.platform-mobile .auth-screen {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  html.platform-mobile .qr-scanner,
+  html.platform-mobile .link-device-qr img {
+    max-width: min(100%, 280px);
+  }
+}

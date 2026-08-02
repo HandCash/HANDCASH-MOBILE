@@ -1,30 +1,35 @@
 # HandCash Mobile
 
-Isolated mobile shell of HandCash Desktop: same brand language, **Scan to link** (Telegram-style) from an unlocked Desktop on the same Wi‑Fi.
+**Same wallet as Desktop** — this app mounts `HANDCASH-DESKTOP/src/App` inside Capacitor with a thin `window.handcash` bridge (localStorage durable prefs, no Electron).
 
-Desktop side: **Settings → Link device**.
+Requires sibling checkout:
 
-## Develop (browser)
+```
+handcash/
+  HANDCASH-DESKTOP/
+  HANDCASH-MOBILE/   ← you are here
+```
+
+## Develop
 
 ```bash
 npm install
-npm run dev
+npm run dev          # http://localhost:5174 — full Desktop UI
 ```
 
-## Build debug APK
-
-Requires **JDK 21+** (Capacitor 7) and Android SDK.
+## APK
 
 ```bash
 bash scripts/build-apk.sh
 # → artifacts/handcash-mobile-debug.apk
 ```
 
-The script downloads a portable Temurin JDK 21 and Android cmdline-tools into `~/.local` if needed (no sudo).
+## What differs from Desktop
 
-## Link flow
-
-1. Desktop unlocked → Settings → **Link device** → password → QR  
-2. Phone + Desktop on same LAN  
-3. Mobile → **Scan to link** → set phone password → same wallet locally  
-4. History sync URL from Desktop is copied when set (BRC-39)
+| Feature | Mobile |
+|---------|--------|
+| UI / vault / backups / link device | Same Desktop code |
+| BRC-100 LAN bridge | Stubbed (Desktop hosts the bridge) |
+| OS keychain seal | Not available — password wrap only |
+| Auto-update | Sideload / store |
+| Device link | Embedded QR show + camera scan (same as Desktop) |
