@@ -1,0 +1,257 @@
+:root {
+  --hc-bg: #000000;
+  --hc-surface: #0a0a0a;
+  --hc-surface-raised: #141414;
+  --hc-border: #262626;
+  --hc-text: #fafafa;
+  --hc-muted: #a1a1aa;
+  --hc-accent: #57ff97;
+  --hc-accent-dim: rgba(87, 255, 151, 0.14);
+  --hc-danger: #f87171;
+  --hc-font: 'Archivo', ui-sans-serif, system-ui, sans-serif;
+  --hc-display: 'Syncopate', 'Archivo', ui-sans-serif, sans-serif;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  background: var(--hc-bg);
+  color: var(--hc-text);
+  font-family: var(--hc-font);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(87, 255, 151, 0.12), transparent 55%),
+    var(--hc-bg);
+}
+
+.app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: calc(12px + var(--safe-top)) 16px calc(16px + var(--safe-bottom));
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--hc-accent);
+  color: #00140a;
+  display: grid;
+  place-items: center;
+  font-family: var(--hc-display);
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+.brand-wordmark {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brand-wordmark strong {
+  font-family: var(--hc-display);
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.brand-wordmark span {
+  font-size: 0.7rem;
+  color: var(--hc-muted);
+}
+
+.hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 28rem;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.hero h1 {
+  margin: 0;
+  font-family: var(--hc-display);
+  font-size: 1.35rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.25;
+}
+
+.hero p,
+.hint {
+  margin: 0;
+  color: var(--hc-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.card-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.action-card {
+  appearance: none;
+  border: 1px solid var(--hc-border);
+  background: linear-gradient(180deg, rgba(20, 20, 20, 0.95), rgba(10, 10, 10, 0.98));
+  color: var(--hc-text);
+  border-radius: 14px;
+  padding: 16px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.action-card strong {
+  font-size: 1rem;
+}
+
+.action-card span {
+  color: var(--hc-muted);
+  font-size: 0.82rem;
+}
+
+.action-card:active {
+  border-color: color-mix(in srgb, var(--hc-accent) 50%, var(--hc-border));
+  background: var(--hc-accent-dim);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 0.8rem;
+  color: var(--hc-muted);
+}
+
+.field input {
+  border-radius: 10px;
+  border: 1px solid var(--hc-border);
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--hc-text);
+  font: inherit;
+  font-size: 1rem;
+  padding: 12px 12px;
+}
+
+.btn {
+  appearance: none;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--hc-accent);
+  color: #00140a;
+}
+
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--hc-text);
+  border: 1px solid var(--hc-border);
+}
+
+.btn-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.error {
+  color: var(--hc-danger);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.home-balance {
+  font-family: var(--hc-display);
+  font-size: 1.8rem;
+  letter-spacing: 0.04em;
+}
+
+.meta-line {
+  font-size: 0.8rem;
+  color: var(--hc-muted);
+  word-break: break-all;
+}
+
+.scanner-shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--hc-border);
+  background: #050505;
+  min-height: 280px;
+}
+
+.scanner-shell video,
+.scanner-shell canvas {
+  width: 100% !important;
+}
+
+.screen-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.screen-title h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.back {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--hc-accent);
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+}
