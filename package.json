@@ -15,7 +15,7 @@
     "apk:release": "npm run cap:sync && cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
-    "@bsv/sdk": "^2.2.0",
+    "@bsv/sdk": "^2.2.17",
     "@capacitor/android": "^7.4.2",
     "@capacitor/app": "^7.0.1",
     "@capacitor/camera": "^7.0.1",

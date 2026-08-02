@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import {
   decodePairingQr,
-  decryptPairingPackage,
-  fetchPairingCiphertext,
+  resolvePairingPackage,
   type PairingPackage,
 } from '../pairing/protocol'
 import { installLinkedVault, setHistoryBackupUrl } from '../wallet/vault'
@@ -36,8 +35,7 @@ export function ScanLinkScreen({ onLinked, onBack }: Props) {
         setBusy(true)
         setError(null)
         const offer = decodePairingQr(text)
-        const cipher = await fetchPairingCiphertext(offer)
-        const next = await decryptPairingPackage(cipher.ivHex, cipher.ciphertextHex, offer.keyHex)
+        const next = await resolvePairingPackage(offer)
         await scanner.stop().catch(() => undefined)
         setPkg(next)
       } catch (err) {
@@ -76,8 +74,7 @@ export function ScanLinkScreen({ onLinked, onBack }: Props) {
     setBusy(true)
     try {
       const offer = decodePairingQr(manual)
-      const cipher = await fetchPairingCiphertext(offer)
-      const next = await decryptPairingPackage(cipher.ivHex, cipher.ciphertextHex, offer.keyHex)
+      const next = await resolvePairingPackage(offer)
       void scannerRef.current?.stop().catch(() => undefined)
       setPkg(next)
     } catch (err) {
@@ -112,7 +109,7 @@ export function ScanLinkScreen({ onLinked, onBack }: Props) {
   return (
     <div className="hero">
       <div className="screen-title">
-        <h2>{pkg ? 'Set phone password' : 'Scan to link'}</h2>
+        <h2>{pkg ? 'Set phone password' : 'Connect existing wallet'}</h2>
         <button type="button" className="back" onClick={onBack}>
           Back
         </button>
@@ -121,8 +118,8 @@ export function ScanLinkScreen({ onLinked, onBack }: Props) {
       {!pkg ? (
         <>
           <p className="hint">
-            On Desktop: Settings → Link device → Show link QR. Phone and computer must be on the
-            same Wi‑Fi.
+            On the device that already has the wallet: Link device → Show QR. Scan it here (either
+            direction works).
           </p>
           <div id="hc-qr-reader" className="scanner-shell" />
           <div className="field">
@@ -149,12 +146,12 @@ export function ScanLinkScreen({ onLinked, onBack }: Props) {
         <>
           <p className="hint">
             Linked wallet <strong>{pkg.handle || pkg.identityKey.slice(0, 12)}</strong>. Choose a
-            password for this phone (can differ from Desktop).
+            password for this phone.
           </p>
           {pkg.historyBackupBaseUrl ? (
             <p className="meta-line mono">History sync: {pkg.historyBackupBaseUrl}</p>
           ) : (
-            <p className="hint">No history sync URL on Desktop — set one there for multi-device balance.</p>
+            <p className="hint">No history sync URL yet — set History backup on either device.</p>
           )}
           <div className="field">
             <label htmlFor="link-password">Phone password</label>
@@ -173,7 +170,7 @@ export function ScanLinkScreen({ onLinked, onBack }: Props) {
             disabled={busy || password.length < 10}
             onClick={() => void finish()}
           >
-            {busy ? 'Saving…' : 'Finish link'}
+            {busy ? 'Saving…' : 'Finish connect'}
           </button>
         </>
       )}

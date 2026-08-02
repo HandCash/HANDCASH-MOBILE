@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { HomeScreen } from './components/HomeScreen'
+import { OnboardingScreen } from './components/OnboardingScreen'
 import { ScanLinkScreen } from './components/ScanLinkScreen'
+import { ShowLinkScreen } from './components/ShowLinkScreen'
 import { hasVault } from './wallet/vault'
 
-type Screen = 'welcome' | 'scan' | 'home'
+type Screen = 'onboarding' | 'connect' | 'show-link' | 'home'
 
 export function App() {
-  const [screen, setScreen] = useState<Screen>(() => (hasVault() ? 'home' : 'welcome'))
+  const [screen, setScreen] = useState<Screen>(() => (hasVault() ? 'home' : 'onboarding'))
 
   return (
     <div className="app" data-aeon-scope="mobile">
@@ -20,33 +22,31 @@ export function App() {
         </div>
       </header>
 
-      {screen === 'welcome' ? (
-        <div className="hero">
-          <h1>Your wallet, on this phone</h1>
-          <p>
-            Same look as Desktop — start by scanning a link QR from an unlocked HandCash Desktop on
-            your Wi‑Fi.
-          </p>
-          <div className="card-stack">
-            <button type="button" className="action-card" onClick={() => setScreen('scan')}>
-              <strong>Scan to link</strong>
-              <span>Telegram-style login from Desktop</span>
-            </button>
-          </div>
-          <p className="hint">
-            History sync (BRC-39 URL) is recommended on Desktop so both devices stay aligned.
-          </p>
-        </div>
+      {screen === 'onboarding' ? (
+        <OnboardingScreen
+          onDone={() => setScreen('home')}
+          onConnect={() => setScreen('connect')}
+        />
       ) : null}
 
-      {screen === 'scan' ? (
+      {screen === 'connect' ? (
         <ScanLinkScreen
-          onBack={() => setScreen(hasVault() ? 'home' : 'welcome')}
+          onBack={() => setScreen(hasVault() ? 'home' : 'onboarding')}
           onLinked={() => setScreen('home')}
         />
       ) : null}
 
-      {screen === 'home' ? <HomeScreen onWipe={() => setScreen('welcome')} /> : null}
+      {screen === 'show-link' ? (
+        <ShowLinkScreen onBack={() => setScreen('home')} />
+      ) : null}
+
+      {screen === 'home' ? (
+        <HomeScreen
+          onWipe={() => setScreen('onboarding')}
+          onShowLink={() => setScreen('show-link')}
+          onScanLink={() => setScreen('connect')}
+        />
+      ) : null}
     </div>
   )
 }

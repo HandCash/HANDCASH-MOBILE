@@ -255,3 +255,18 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.75rem;
 }
+
+.link-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.link-qr img {
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+  max-width: 100%;
+  height: auto;
+}

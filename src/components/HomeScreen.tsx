@@ -8,9 +8,11 @@ import {
 
 type Props = {
   onWipe: () => void
+  onShowLink: () => void
+  onScanLink: () => void
 }
 
-export function HomeScreen({ onWipe }: Props) {
+export function HomeScreen({ onWipe, onShowLink, onScanLink }: Props) {
   const meta = readVaultMeta()
   const historyUrl = getHistoryBackupUrl()
   const [password, setPassword] = useState('')
@@ -37,7 +39,7 @@ export function HomeScreen({ onWipe }: Props) {
       <h1>{meta?.handle || 'Wallet'}</h1>
       {!unlocked ? (
         <>
-          <p className="hint">Unlock the wallet linked from Desktop.</p>
+          <p className="hint">Unlock this phone’s wallet.</p>
           <div className="field">
             <label htmlFor="unlock-password">Password</label>
             <input
@@ -60,16 +62,23 @@ export function HomeScreen({ onWipe }: Props) {
       ) : (
         <>
           <div className="home-balance">Ready</div>
-          <p className="hint">
-            Same wallet as Desktop. History sync keeps balances aligned when a BRC-39 URL is set.
-          </p>
           <p className="meta-line mono">{meta?.identityKey}</p>
           <p className="meta-line mono">{meta?.address}</p>
           {historyUrl ? (
             <p className="meta-line mono">Sync: {historyUrl}</p>
           ) : (
-            <p className="hint">No history sync URL stored — set History backup on Desktop.</p>
+            <p className="hint">Set History backup on Desktop for multi-device balance sync.</p>
           )}
+          <div className="card-stack">
+            <button type="button" className="action-card" onClick={onShowLink}>
+              <strong>Show link QR</strong>
+              <span>Let another device connect to this wallet</span>
+            </button>
+            <button type="button" className="action-card" onClick={onScanLink}>
+              <strong>Scan to connect</strong>
+              <span>Pull a wallet shown on another device</span>
+            </button>
+          </div>
         </>
       )}
 
