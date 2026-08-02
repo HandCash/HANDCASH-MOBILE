@@ -223,9 +223,14 @@ export function installMobileBridge(): void {
           error:
             platform === 'web'
               ? 'Native BRC-100 bridge requires the Android app'
-              : 'Could not bind http://127.0.0.1:3321',
+              : 'Could not bind loopback :3321 (127.0.0.1 / ::1)',
         }
     injectWebViewWalletHint()
     emitBridge()
+    if (bridgeStatus.online) {
+      console.info('[brc100] bridge online', bridgeStatus.httpUrl, '(also ::1 for localhost)')
+    } else {
+      console.warn('[brc100] bridge offline', bridgeStatus.error)
+    }
   })()
 }
