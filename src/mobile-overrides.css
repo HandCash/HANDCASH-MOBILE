@@ -270,11 +270,12 @@ html.platform-mobile .wallet-nav-bar-track {
 html.platform-mobile .wallet-nav-tab {
   flex: 1 1 0;
   min-width: 0;
-  min-height: 44px;
+  min-height: 52px;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
   gap: 0;
-  padding: 8px 2px;
+  padding: 8px 2px 10px;
   border-radius: 12px;
   scroll-snap-align: none;
 }
@@ -282,19 +283,22 @@ html.platform-mobile .wallet-nav-tab {
 html.platform-mobile .wallet-nav-tab svg {
   width: 22px;
   height: 22px;
+  /* Keep the glyph locked to the tab’s horizontal center. */
+  flex-shrink: 0;
 }
 
-/* Icon-only tabs; short label only on the selected one */
-html.platform-mobile .wallet-nav-tab-label,
-html.platform-mobile .wallet-nav-tab-label-short {
-  display: none;
-}
-
-html.platform-mobile .wallet-nav-tab.is-active .wallet-nav-tab-label-short,
-html.platform-mobile .wallet-nav-tab[aria-selected='true'] .wallet-nav-tab-label-short,
-html.platform-mobile .wallet-nav-tab[data-selected] .wallet-nav-tab-label-short {
+/*
+ * Label only on the selected tab. Absolute under the icon so showing
+ * text never shifts the icon on X (or Y).
+ */
+html.platform-mobile .wallet-nav-tab-label {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: calc(50% + 12px);
   display: block;
-  margin-top: 2px;
+  margin: 0;
+  padding: 0;
   font-family: var(--hc-display);
   font-size: 0.58rem;
   letter-spacing: 0.02em;
@@ -306,6 +310,15 @@ html.platform-mobile .wallet-nav-tab[data-selected] .wallet-nav-tab-label-short 
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+html.platform-mobile .wallet-nav-tab.is-active .wallet-nav-tab-label,
+html.platform-mobile .wallet-nav-tab[aria-selected='true'] .wallet-nav-tab-label,
+html.platform-mobile .wallet-nav-tab[data-selected] .wallet-nav-tab-label {
+  opacity: 1;
 }
 
 html.platform-mobile .wallet-nav-tab:hover {
@@ -315,7 +328,8 @@ html.platform-mobile .wallet-nav-tab:hover {
 html.platform-mobile .wallet-nav-tab.is-active,
 html.platform-mobile .wallet-nav-tab[aria-selected='true'],
 html.platform-mobile .wallet-nav-tab[data-selected] {
-  flex: 1.25 1 0;
+  /* Equal flex — growing the selected tab was shifting every icon on X. */
+  flex: 1 1 0;
   color: var(--hc-accent);
   background: color-mix(in srgb, var(--hc-accent) 12%, transparent);
 }

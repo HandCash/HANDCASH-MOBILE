@@ -17,8 +17,30 @@ export default defineConfig({
       { find: '@', replacement: DESKTOP_SRC },
       // Resolve Desktop app modules from the sibling repo.
       { find: /^@desktop\/(.*)/, replacement: path.join(DESKTOP_SRC, '$1') },
+      // Prefer Mobile node_modules when bundling Desktop sources (Desktop
+      // node_modules may be absent during a parallel/clean mobile-only build).
+      // Exact-match only — prefix aliases break @bsv/sdk package exports
+      // (e.g. @bsv/sdk/primitives/AESGCM → dist/esm/...).
+      {
+        find: /^@bsv\/wallet-toolbox-client$/,
+        replacement: path.resolve(
+          __dirname,
+          'node_modules/@bsv/wallet-toolbox-client',
+        ),
+      },
+      {
+        find: /^@bsv\/sdk$/,
+        replacement: path.resolve(__dirname, 'node_modules/@bsv/sdk'),
+      },
     ],
-    dedupe: ['react', 'react-dom', 'xstate', '@xstate/react', '@bsv/sdk'],
+    dedupe: [
+      'react',
+      'react-dom',
+      'xstate',
+      '@xstate/react',
+      '@bsv/sdk',
+      '@bsv/wallet-toolbox-client',
+    ],
   },
   optimizeDeps: {
     ...aeonUiOptimizeDeps(),

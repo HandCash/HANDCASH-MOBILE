@@ -28,8 +28,9 @@ bash scripts/build-apk.sh
 
 | Feature | Mobile |
 |---------|--------|
-| UI / vault / backups / link device | Same Desktop code |
-| BRC-100 LAN bridge | Stubbed (Desktop hosts the bridge) |
-| OS keychain seal | Not available — password wrap only |
+| UI / vault / backups / identity handoff | Same Desktop code (BRC-75 phrase / BRC-140 shares) |
+| BRC-100 LAN bridge | Native loopback `:3321` when the Android app is running |
+| OS keychain seal | Device auth plugin when available; else password wrap |
 | Auto-update | Sideload / store |
-| Device link | Embedded QR show + camera scan (same as Desktop) |
+| Multi-device funds | Same restored identity shares the chain pot — use Refresh to heal spends; no custom device-link sync |
+| Collectables read | Local only — games talk to the open wallet |
