@@ -1,4 +1,4 @@
-/* Full Desktop UI — phone shell + floating RN-style tab bar */
+/* HandCash Mobile — Desktop Aeon UI on Capacitor (layout overrides only). */
 
 html.platform-mobile,
 html.platform-mobile body {
@@ -21,7 +21,7 @@ html.platform-mobile .nav-section-body {
 }
 
 html.platform-mobile .aeonToast__viewport {
-  bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* ── Dashboard: hero → compact BSV row → content ── */
@@ -34,7 +34,7 @@ html.platform-mobile .dashboard {
   min-height: 100%;
   gap: 8px;
   overflow: hidden;
-  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
 }
 
@@ -140,6 +140,34 @@ html.platform-mobile .what-is-bsv {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+html.platform-mobile .what-is-bsv .bsv-market-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+html.platform-mobile .what-is-bsv .bsv-toast-cover {
+  padding: 10px 14px;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+html.platform-mobile .what-is-bsv .bsv-toast-title {
+  font-size: 0.82rem;
+  letter-spacing: 0.05em;
+}
+
+html.platform-mobile .what-is-bsv .bsv-toast-body {
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 html.platform-mobile .wallet-nav-shell {
@@ -149,7 +177,6 @@ html.platform-mobile .wallet-nav-shell {
   height: auto;
   display: flex;
   flex-direction: column;
-  /* content panel only — tab bar floats outside */
   overflow: hidden;
 }
 
@@ -164,6 +191,54 @@ html.platform-mobile .wallet-nav-stage {
   flex: 1;
   min-height: 0;
   padding-bottom: 8px;
+}
+
+html.platform-mobile .wallet-nav-stage:has(.nav-child-stage) {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+html.platform-mobile .wallet-nav-stage:has(.nav-child-stage) > .wallet-nav-panel.nav-child-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+html.platform-mobile .nav-child-body {
+  -webkit-overflow-scrolling: touch;
+}
+
+html.platform-mobile .nav-breadcrumb-head {
+  background: color-mix(in srgb, #0a0f0d 96%, transparent);
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+  min-height: 24px;
+}
+
+html.platform-mobile .connected-panel-head,
+html.platform-mobile .panel-label-bar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+}
+
+html.platform-mobile .wallet-nav-stage:has(.empty-state) {
+  display: flex;
+  flex-direction: column;
+}
+
+html.platform-mobile .wallet-nav-stage:has(.empty-state) > .wallet-nav-panel,
+html.platform-mobile .nav-section-body:has(> .empty-state) {
+  flex: 1 1 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+html.platform-mobile .empty-state {
+  flex: 1 1 auto;
+  min-height: 100%;
+  place-content: center;
 }
 
 /* Compact BSV ticker: logo/name | sparkline | price */
@@ -245,25 +320,25 @@ html.platform-mobile .what-is-bsv .bsv-about {
   display: none !important;
 }
 
-/* ── Floating bottom tab bar (outside panel, near full-width) ── */
+/* Aeon wallet-nav dock — fixed, lean, labels always on */
+html.platform-mobile [data-aeon-scope='wallet-nav'] .wallet-nav-bar,
 html.platform-mobile .wallet-nav-bar {
   position: fixed;
-  left: 6px;
-  right: 6px;
-  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  left: 4px;
+  right: 4px;
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px));
   z-index: 40;
   box-sizing: border-box;
-  padding: 6px 6px;
-  border: 1px solid color-mix(in srgb, hsl(var(--border)) 80%, transparent);
-  border-radius: 18px;
-  background: color-mix(in srgb, #0c1210 88%, transparent);
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  padding: 3px;
+  border: 1px solid hsl(var(--border));
+  border-radius: calc(var(--radius, 0.5rem) * 1.75);
+  background: color-mix(in srgb, hsl(var(--background)) 90%, transparent);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
   box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-  /* Labels may extend past a narrow tab — don’t clip “Collectables”. */
-  overflow: visible;
+    0 4px 16px rgba(0, 0, 0, 0.32),
+    0 0 0 1px color-mix(in srgb, hsl(var(--foreground)) 5%, transparent) inset;
+  overflow: hidden;
   scroll-snap-type: none;
 }
 
@@ -271,80 +346,83 @@ html.platform-mobile .wallet-nav-bar-track {
   display: flex;
   width: 100%;
   min-width: 0;
-  gap: 2px;
+  gap: 1px;
   justify-content: stretch;
   align-items: stretch;
-  overflow: visible;
+  overflow: hidden;
 }
 
 html.platform-mobile .wallet-nav-tab {
+  position: relative;
   flex: 1 1 0;
   min-width: 0;
-  min-height: 52px;
+  min-height: 0;
+  height: 40px;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 0;
-  padding: 8px 2px 14px;
-  border-radius: 12px;
+  gap: 2px;
+  padding: 4px 1px;
+  border-radius: calc(var(--radius, 0.5rem) * 1.25);
   scroll-snap-align: none;
-  overflow: visible;
+  overflow: hidden;
+  color: hsl(var(--muted-foreground));
+  background: transparent;
+  transition: color 140ms ease, background 140ms ease;
 }
 
 html.platform-mobile .wallet-nav-tab svg {
-  width: 22px;
-  height: 22px;
-  /* Keep the glyph locked to the tab’s horizontal center. */
+  width: 17px;
+  height: 17px;
   flex-shrink: 0;
 }
 
-/*
- * Label only on the selected tab. Absolute under the icon so showing
- * text never shifts the icon on X (or Y). Width follows the full word.
- */
+/* Mobile: short labels always visible; full names stay in aria-label/title */
 html.platform-mobile .wallet-nav-tab-label {
-  position: absolute;
-  left: 50%;
-  right: auto;
-  top: calc(50% + 12px);
-  transform: translateX(-50%);
-  display: block;
-  margin: 0;
-  padding: 0 2px;
-  width: max-content;
-  max-width: none;
-  font-family: var(--hc-display);
-  font-size: 0.55rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-weight: 700;
-  line-height: 1.15;
-  white-space: nowrap;
-  text-align: center;
-  overflow: visible;
-  text-overflow: clip;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 140ms ease;
+  display: none !important;
 }
 
-html.platform-mobile .wallet-nav-tab.is-active .wallet-nav-tab-label,
-html.platform-mobile .wallet-nav-tab[aria-selected='true'] .wallet-nav-tab-label,
-html.platform-mobile .wallet-nav-tab[data-selected] .wallet-nav-tab-label {
+html.platform-mobile .wallet-nav-tab-label-short {
+  position: static;
+  left: auto;
+  top: auto;
+  transform: none;
+  display: block;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  font-family: var(--font-display, var(--hc-display));
+  font-size: 0.5rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+  text-align: center;
+  overflow: hidden;
+  opacity: 1;
+  pointer-events: none;
+}
+
+html.platform-mobile .wallet-nav-tab.is-active .wallet-nav-tab-label-short,
+html.platform-mobile .wallet-nav-tab[aria-selected='true'] .wallet-nav-tab-label-short,
+html.platform-mobile .wallet-nav-tab[data-selected] .wallet-nav-tab-label-short {
   opacity: 1;
 }
 
 html.platform-mobile .wallet-nav-tab:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, hsl(var(--foreground)) 5%, transparent);
+  color: hsl(var(--foreground));
 }
 
 html.platform-mobile .wallet-nav-tab.is-active,
 html.platform-mobile .wallet-nav-tab[aria-selected='true'],
 html.platform-mobile .wallet-nav-tab[data-selected] {
-  /* Equal flex — growing the selected tab was shifting every icon on X. */
   flex: 1 1 0;
-  color: var(--hc-accent);
-  background: color-mix(in srgb, var(--hc-accent) 12%, transparent);
+  color: hsl(var(--primary));
+  background: color-mix(in srgb, hsl(var(--primary)) 12%, transparent);
 }
 
 html.platform-mobile .wallet-nav-tab.is-active::after,

@@ -15,6 +15,7 @@ import {
   nativeDeviceAuthStatus,
   nativeDeviceAuthUnlock,
 } from './deviceAuthNative'
+import { formatAppLogs, installAppLogCapture } from '@desktop/wallet/appLog'
 
 type BridgeStatus = {
   online: boolean
@@ -151,7 +152,16 @@ export function installMobileBridge(): void {
       window.open(url, '_blank', 'noopener,noreferrer')
     },
     getLogInfo: async () => ({ file: null, dir: null }),
-    openLogs: async () => ({ ok: false as const, error: 'Logs are Desktop-only' }),
+    openLogs: async () => ({ ok: false as const, error: 'Finder reveal is Desktop-only' }),
+    readLogs: async () => {
+      const text = formatAppLogs()
+      return {
+        ok: true as const,
+        text,
+        bytes: text.length,
+        truncated: false,
+      }
+    },
     uploadLogs: async () => ({ ok: false as const, error: 'Log upload is Desktop-only' }),
     startDeviceLink: async () => ({
       ok: false as const,
@@ -216,6 +226,8 @@ export function installMobileBridge(): void {
     writable: false,
     configurable: true,
   })
+
+  installAppLogCapture()
 
   // Native → JS BRC-100 requests (same path Desktop uses via Electron IPC).
   onNativeBrc100Request((native) => {
