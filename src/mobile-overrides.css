@@ -106,21 +106,29 @@ html.platform-mobile .wallet-actions {
 html.platform-mobile .wallet-actions .btn {
   flex: 1 1 0;
   min-width: 0;
+  overflow: visible;
 }
 
 html.platform-mobile .wallet-actions .btn-icon {
   flex-direction: column;
   gap: 3px;
-  padding: 8px 4px;
+  padding: 8px 2px;
+  overflow: visible;
 }
 
 html.platform-mobile .wallet-action-label {
   display: block !important;
-  font-size: 0.62rem;
-  letter-spacing: 0.04em;
+  width: 100%;
+  max-width: none;
+  font-size: 0.58rem;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  text-align: center;
 }
 
 html.platform-mobile .what-is-bsv {
@@ -254,7 +262,8 @@ html.platform-mobile .wallet-nav-bar {
   box-shadow:
     0 8px 28px rgba(0, 0, 0, 0.45),
     0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-  overflow: hidden;
+  /* Labels may extend past a narrow tab — don’t clip “Collectables”. */
+  overflow: visible;
   scroll-snap-type: none;
 }
 
@@ -265,6 +274,7 @@ html.platform-mobile .wallet-nav-bar-track {
   gap: 2px;
   justify-content: stretch;
   align-items: stretch;
+  overflow: visible;
 }
 
 html.platform-mobile .wallet-nav-tab {
@@ -275,9 +285,10 @@ html.platform-mobile .wallet-nav-tab {
   justify-content: center;
   align-items: center;
   gap: 0;
-  padding: 8px 2px 10px;
+  padding: 8px 2px 14px;
   border-radius: 12px;
   scroll-snap-align: none;
+  overflow: visible;
 }
 
 html.platform-mobile .wallet-nav-tab svg {
@@ -289,27 +300,29 @@ html.platform-mobile .wallet-nav-tab svg {
 
 /*
  * Label only on the selected tab. Absolute under the icon so showing
- * text never shifts the icon on X (or Y).
+ * text never shifts the icon on X (or Y). Width follows the full word.
  */
 html.platform-mobile .wallet-nav-tab-label {
   position: absolute;
-  left: 2px;
-  right: 2px;
+  left: 50%;
+  right: auto;
   top: calc(50% + 12px);
+  transform: translateX(-50%);
   display: block;
   margin: 0;
-  padding: 0;
+  padding: 0 2px;
+  width: max-content;
+  max-width: none;
   font-family: var(--hc-display);
-  font-size: 0.58rem;
-  letter-spacing: 0.02em;
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1.15;
   white-space: nowrap;
   text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+  overflow: visible;
+  text-overflow: clip;
   opacity: 0;
   pointer-events: none;
   transition: opacity 140ms ease;
