@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { aeonUiOptimizeDeps, aeonUiViteAliases } from 'aeon-ui-engine/vite'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -8,9 +9,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DESKTOP_ROOT = path.resolve(__dirname, '../HANDCASH-DESKTOP')
 const DESKTOP_SRC = path.join(DESKTOP_ROOT, 'src')
 
+// Desktop sources ship a Desktop semver constant; the Mobile shell must show its own.
+const pkg = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'),
+) as { version: string }
+
 export default defineConfig({
   plugins: [react()],
   base: './',
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   resolve: {
     alias: [
       ...aeonUiViteAliases(),

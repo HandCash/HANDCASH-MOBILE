@@ -48,7 +48,7 @@ type UpdateStatus = {
   canInstall: boolean
 }
 
-const VERSION = '0.1.0-mobile'
+const VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0'
 
 let bridgeStatus: BridgeStatus = {
   online: false,
