@@ -68,6 +68,15 @@ if [[ -d "$NATIVE_SRC" && -d "$NATIVE_DST" ]]; then
   cp -f "$NATIVE_SRC"/*.java "$NATIVE_DST/" 2>/dev/null || true
 fi
 
+# Brand icons and splash over Capacitor's defaults (regenerate with scripts/gen-android-icons.py).
+RES_SRC="$NATIVE_SRC/res"
+RES_DST="$ROOT/android/app/src/main/res"
+if [[ -d "$RES_SRC" && -d "$RES_DST" ]]; then
+  cp -R "$RES_SRC"/. "$RES_DST/"
+else
+  echo "WARNING: brand res not applied ($RES_SRC missing)" >&2
+fi
+
 # Cleartext LAN pairing + camera + biometrics
 MANIFEST="$ROOT/android/app/src/main/AndroidManifest.xml"
 if [[ -f "$MANIFEST" ]]; then
