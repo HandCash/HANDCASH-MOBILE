@@ -377,17 +377,17 @@ html.platform-mobile .wallet-nav-tab svg {
   flex-shrink: 0;
 }
 
-/* Mobile: short labels always visible; full names stay in aria-label/title */
+/* Mobile: short labels only on the selected tab; full names stay in aria-label/title */
 html.platform-mobile .wallet-nav-tab-label {
   display: none !important;
 }
 
 html.platform-mobile .wallet-nav-tab-label-short {
+  display: none;
   position: static;
   left: auto;
   top: auto;
   transform: none;
-  display: block;
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -402,14 +402,13 @@ html.platform-mobile .wallet-nav-tab-label-short {
   white-space: nowrap;
   text-align: center;
   overflow: hidden;
-  opacity: 1;
   pointer-events: none;
 }
 
 html.platform-mobile .wallet-nav-tab.is-active .wallet-nav-tab-label-short,
 html.platform-mobile .wallet-nav-tab[aria-selected='true'] .wallet-nav-tab-label-short,
 html.platform-mobile .wallet-nav-tab[data-selected] .wallet-nav-tab-label-short {
-  opacity: 1;
+  display: block;
 }
 
 html.platform-mobile .wallet-nav-tab:hover {
