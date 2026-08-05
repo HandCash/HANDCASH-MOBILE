@@ -57,8 +57,8 @@ yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_H
 
 npm install
 npm run build
-npx cap add android 2>/dev/null || true
-npx cap sync android
+node node_modules/@capacitor/cli/bin/capacitor add android 2>/dev/null || true
+node node_modules/@capacitor/cli/bin/capacitor sync android
 
 # Restore tracked native plugins (android/ is gitignored).
 NATIVE_SRC="$ROOT/native-android"
@@ -122,7 +122,7 @@ GRADLE="$ROOT/android/app/build.gradle"
 MOBILE_VERSION="$(node -p "require('./package.json').version")"
 MOBILE_CODE="$(node -p "const v=require('./package.json').version.split('.').map(Number); console.log(v[0]*10000+v[1]*100+v[2])")"
 if [[ -f "$GRADLE" ]]; then
-  perl -i -pe "s/versionCode\\s+\\d+/versionCode ${MOBILE_CODE}/; s/versionName\\s+\\\"[^\\\"]+\\\"/versionName \\\"${MOBILE_VERSION}\\\"/" "$GRADLE"
+  perl -i -pe "s/versionCode\\s+\\d+/versionCode ${MOBILE_CODE}/; s/versionName\\s+\\\"[^\\\"]+\\\"/versionName \\\"${MOBILE_VERSION}\\\"/; s/^undefined\\s*$//" "$GRADLE"
 fi
 
 (
