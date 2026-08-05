@@ -4,6 +4,8 @@ type DeviceAuthStatus = {
   available: boolean
   enrolled: boolean
   label: string
+  /** True when the unlock key is StrongBox-backed (Android hardware SE). */
+  strongBox?: boolean
 }
 
 type DeviceAuthPlugin = {

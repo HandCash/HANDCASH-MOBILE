@@ -2,6 +2,11 @@ package io.handcash.mobile;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyInfo;
+import android.security.keystore.KeyProperties;
+import android.security.keystore.StrongBoxUnavailableException;
 import android.util.Base64;
 import android.util.Log;
 
@@ -24,11 +29,14 @@ import java.util.concurrent.Executor;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
 
 /**
- * Biometric-gated unlock: password sealed with an Android Keystore key that
- * requires user authentication (fingerprint / face / device credential).
+ * Biometric-gated unlock: vault password sealed with an Android Keystore AES key.
+ *
+ * Prefers StrongBox (hardware secure element) when the device exposes one;
+ * falls back to TEE. The sealing key never leaves secure hardware when available.
  */
 @CapacitorPlugin(name = "DeviceAuth")
 public class DeviceAuthPlugin extends Plugin {
@@ -36,7 +44,9 @@ public class DeviceAuthPlugin extends Plugin {
     private static final String PREFS = "handcash_device_auth";
     private static final String PREF_CIPHER = "cipher_b64";
     private static final String PREF_IV = "iv_b64";
-    private static final String KEY_ALIAS = "handcash_device_unlock_v1";
+    private static final String PREF_STRONGBOX = "strongbox";
+    private static final String KEY_ALIAS = "handcash_device_unlock_v2";
+    private static final String KEY_ALIAS_LEGACY = "handcash_device_unlock_v1";
     private static final String TRANSFORMATION = "AES/GCM/NoPadding";
 
     @PluginMethod
@@ -44,9 +54,14 @@ public class DeviceAuthPlugin extends Plugin {
         JSObject ret = new JSObject();
         boolean available = canAuthenticate();
         boolean enrolled = available && hasStoredSecret();
+        boolean strongBox = prefs().getBoolean(PREF_STRONGBOX, false);
+        if (enrolled && !strongBox) {
+            strongBox = probeStrongBox();
+        }
         ret.put("available", available);
         ret.put("enrolled", enrolled);
-        ret.put("label", "Biometrics");
+        ret.put("strongBox", strongBox);
+        ret.put("label", strongBox ? "Hardware key" : "Biometrics");
         call.resolve(ret);
     }
 
@@ -116,42 +131,102 @@ public class DeviceAuthPlugin extends Plugin {
     }
 
     private void clearStored() {
-        prefs().edit().remove(PREF_CIPHER).remove(PREF_IV).apply();
+        prefs().edit().remove(PREF_CIPHER).remove(PREF_IV).remove(PREF_STRONGBOX).apply();
+        deleteAlias(KEY_ALIAS);
+        deleteAlias(KEY_ALIAS_LEGACY);
+    }
+
+    private void deleteAlias(String alias) {
         try {
             KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
             ks.load(null);
-            if (ks.containsAlias(KEY_ALIAS)) ks.deleteEntry(KEY_ALIAS);
+            if (ks.containsAlias(alias)) ks.deleteEntry(alias);
         } catch (Exception e) {
-            Log.w(TAG, "clear keystore failed", e);
+            Log.w(TAG, "clear keystore failed for " + alias, e);
         }
     }
 
-    private SecretKey getOrCreateKey() throws Exception {
+    /**
+     * Create (or load) the unlock key. New keys prefer StrongBox; legacy v1
+     * aliases are still readable until the user re-enrolls.
+     */
+    private SecretKey getOrCreateKey(boolean createIfMissing) throws Exception {
         KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
         ks.load(null);
         if (ks.containsAlias(KEY_ALIAS)) {
             return (SecretKey) ks.getKey(KEY_ALIAS, null);
         }
-        KeyGenerator kg = KeyGenerator.getInstance("AES", "AndroidKeyStore");
-        android.security.keystore.KeyGenParameterSpec spec =
-                new android.security.keystore.KeyGenParameterSpec.Builder(
+        if (ks.containsAlias(KEY_ALIAS_LEGACY)) {
+            return (SecretKey) ks.getKey(KEY_ALIAS_LEGACY, null);
+        }
+        if (!createIfMissing) {
+            throw new IllegalStateException("No device unlock key enrolled");
+        }
+        return createKeyPreferStrongBox();
+    }
+
+    private SecretKey createKeyPreferStrongBox() throws Exception {
+        // Prefer StrongBox (hardware SE) when the device supports it.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            try {
+                SecretKey key = generateAesKey(true);
+                prefs().edit().putBoolean(PREF_STRONGBOX, true).apply();
+                Log.i(TAG, "Device unlock key created in StrongBox");
+                return key;
+            } catch (StrongBoxUnavailableException e) {
+                Log.i(TAG, "StrongBox unavailable — falling back to TEE", e);
+            } catch (Exception e) {
+                // Some OEM keystores throw generic exceptions when StrongBox is missing.
+                Log.i(TAG, "StrongBox request failed — falling back to TEE: " + e.getMessage());
+            }
+        }
+        SecretKey key = generateAesKey(false);
+        prefs().edit().putBoolean(PREF_STRONGBOX, false).apply();
+        Log.i(TAG, "Device unlock key created in TEE");
+        return key;
+    }
+
+    private SecretKey generateAesKey(boolean strongBox) throws Exception {
+        KeyGenerator kg = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+        KeyGenParameterSpec.Builder builder =
+                new KeyGenParameterSpec.Builder(
                                 KEY_ALIAS,
-                                android.security.keystore.KeyProperties.PURPOSE_ENCRYPT
-                                        | android.security.keystore.KeyProperties.PURPOSE_DECRYPT)
-                        .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
-                        .setEncryptionPaddings(
-                                android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
+                                KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                         .setUserAuthenticationRequired(true)
-                        .setInvalidatedByBiometricEnrollment(false)
-                        .build();
-        kg.init(spec);
+                        .setInvalidatedByBiometricEnrollment(false);
+        if (strongBox && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            builder.setIsStrongBoxBacked(true);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            builder.setUserAuthenticationParameters(
+                    0, KeyProperties.AUTH_BIOMETRIC_STRONG);
+        }
+        kg.init(builder.build());
         return kg.generateKey();
+    }
+
+    private boolean probeStrongBox() {
+        try {
+            SecretKey key = getOrCreateKey(false);
+            SecretKeyFactory factory =
+                    SecretKeyFactory.getInstance(key.getAlgorithm(), "AndroidKeyStore");
+            KeyInfo info = (KeyInfo) factory.getKeySpec(key, KeyInfo.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                return info.getSecurityLevel() == KeyProperties.SECURITY_LEVEL_STRONGBOX;
+            }
+            return info.isInsideSecureHardware();
+        } catch (Exception e) {
+            return prefs().getBoolean(PREF_STRONGBOX, false);
+        }
     }
 
     private void promptAndEnroll(PluginCall call, String password) {
         try {
             clearStored();
-            SecretKey key = getOrCreateKey();
+            SecretKey key = getOrCreateKey(true);
+            boolean strongBox = prefs().getBoolean(PREF_STRONGBOX, false);
             Cipher cipher = Cipher.getInstance(TRANSFORMATION);
             cipher.init(Cipher.ENCRYPT_MODE, key);
             Executor executor = ContextCompat.getMainExecutor(getContext());
@@ -175,9 +250,11 @@ public class DeviceAuthPlugin extends Plugin {
                                                         Base64.encodeToString(encrypted, Base64.NO_WRAP))
                                                 .putString(
                                                         PREF_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
+                                                .putBoolean(PREF_STRONGBOX, strongBox)
                                                 .apply();
                                         JSObject ret = new JSObject();
                                         ret.put("ok", true);
+                                        ret.put("strongBox", strongBox);
                                         call.resolve(ret);
                                     } catch (Exception e) {
                                         Log.w(TAG, "enroll encrypt failed", e);
@@ -195,11 +272,14 @@ public class DeviceAuthPlugin extends Plugin {
                                     // keep prompt open for retries
                                 }
                             });
-            // CryptoObject cannot be combined with DEVICE_CREDENTIAL on many API levels.
+            String subtitle =
+                    strongBox
+                            ? "Seal unlock with this device's secure element"
+                            : "Confirm to save unlock for HandCash";
             BiometricPrompt.PromptInfo info =
                     new BiometricPrompt.PromptInfo.Builder()
                             .setTitle("Enable biometric unlock")
-                            .setSubtitle("Confirm to save unlock for HandCash")
+                            .setSubtitle(subtitle)
                             .setNegativeButtonText("Cancel")
                             .setAllowedAuthenticators(
                                     BiometricManager.Authenticators.BIOMETRIC_STRONG)
@@ -216,7 +296,7 @@ public class DeviceAuthPlugin extends Plugin {
             SharedPreferences prefs = prefs();
             byte[] iv = Base64.decode(prefs.getString(PREF_IV, ""), Base64.NO_WRAP);
             byte[] encrypted = Base64.decode(prefs.getString(PREF_CIPHER, ""), Base64.NO_WRAP);
-            SecretKey key = getOrCreateKey();
+            SecretKey key = getOrCreateKey(false);
             Cipher cipher = Cipher.getInstance(TRANSFORMATION);
             cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(128, iv));
             Executor executor = ContextCompat.getMainExecutor(getContext());

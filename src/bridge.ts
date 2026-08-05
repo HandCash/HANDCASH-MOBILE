@@ -15,7 +15,6 @@ import {
   nativeDeviceAuthStatus,
   nativeDeviceAuthUnlock,
 } from './deviceAuthNative'
-import { nativeDeviceInfo, type MobileDeviceInfo } from './deviceInfoNative'
 import { formatAppLogs, installAppLogCapture } from '@desktop/wallet/appLog'
 
 type BridgeStatus = {
@@ -111,7 +110,6 @@ export function installMobileBridge(): void {
       isPackaged: true,
       platform,
     }),
-    getDeviceInfo: async (): Promise<MobileDeviceInfo> => nativeDeviceInfo(),
     getBridgeStatus: async () => bridgeStatus,
     restartBridge: async () => {
       await stopNativeBrc100Bridge()
