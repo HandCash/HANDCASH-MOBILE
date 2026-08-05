@@ -440,4 +440,12 @@ html.platform-mobile .wallet-nav-tab[data-selected]::after {
   html.platform-mobile .qr-scanner-view {
     min-height: 320px;
   }
+
+  html.platform-mobile .send-collectable-panel .send-layout {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  html.platform-mobile .scan-choice {
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
 }
