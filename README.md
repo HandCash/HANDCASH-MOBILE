@@ -36,6 +36,21 @@ Camera permission is required for **Scan to link** (device pair QR) and Dashboar
 
 QR scanning uses `@zxing/browser` when the WebView has no `BarcodeDetector` (typical on Android).
 
+## GrapheneOS
+
+HandCash Mobile is built for **sideloading** — no Google Play Services required.
+
+| Topic | Behavior |
+|-------|----------|
+| Install | Sideload the APK from [handcash.io/wallet](https://handcash.io/wallet); verify SHA-256 when published |
+| Play Services | Not used — push and Google Sign-In are absent by design |
+| Backup | `allowBackup=false` — vault data stays in the app sandbox |
+| Camera | Required for Scan to link; grant in Settings → Apps → HandCash → Permissions |
+| Biometrics | Optional (Android Keystore); password unlock always works |
+| Updates | Sideload a newer APK — Settings → About shows sideload guidance on GrapheneOS |
+
+When the app detects GrapheneOS, **Settings → About** shows a GrapheneOS note with camera, update, and backup details.
+
 ## What differs from Desktop
 
 | Feature | Mobile |

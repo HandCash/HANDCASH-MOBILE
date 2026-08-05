@@ -80,6 +80,36 @@ if [[ -f "$MANIFEST" ]]; then
   if ! grep -q 'usesCleartextTraffic' "$MANIFEST"; then
     perl -i -pe 's|<application|<application android:usesCleartextTraffic="true"|' "$MANIFEST"
   fi
+  if grep -q 'android:allowBackup="true"' "$MANIFEST"; then
+    perl -i -pe 's|android:allowBackup="true"|android:allowBackup="false"|' "$MANIFEST"
+  fi
+  if ! grep -q 'fullBackupContent' "$MANIFEST"; then
+    perl -i -pe 's|android:allowBackup="false"|android:allowBackup="false"\n        android:fullBackupContent="false"\n        android:dataExtractionRules="@xml/data_extraction_rules"|' "$MANIFEST"
+  fi
+fi
+
+RULES="$ROOT/android/app/src/main/res/xml/data_extraction_rules.xml"
+if [[ ! -f "$RULES" ]]; then
+  mkdir -p "$(dirname "$RULES")"
+  cp -f "$ROOT/native-android/data_extraction_rules.xml" "$RULES" 2>/dev/null || cat > "$RULES" <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>
+EOF
 fi
 
 GRADLE="$ROOT/android/app/build.gradle"

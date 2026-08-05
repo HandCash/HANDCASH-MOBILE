@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(Brc100LocalBridgePlugin.class);
         registerPlugin(DeviceAuthPlugin.class);
+        registerPlugin(DeviceInfoPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
