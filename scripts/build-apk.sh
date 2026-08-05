@@ -117,6 +117,14 @@ if [[ -f "$GRADLE" ]] && ! grep -q 'androidx.biometric:biometric' "$GRADLE"; the
   perl -i -pe 's|(implementation "androidx.core:core-splashscreen:[^"]+")|$1\n    implementation "androidx.biometric:biometric:1.1.0"|' "$GRADLE"
 fi
 
+# Stamp app version after Capacitor sync (android/ is often regenerated).
+GRADLE="$ROOT/android/app/build.gradle"
+MOBILE_VERSION="$(node -p "require('./package.json').version")"
+MOBILE_CODE="$(node -p "const v=require('./package.json').version.split('.').map(Number); console.log(v[0]*10000+v[1]*100+v[2])")"
+if [[ -f "$GRADLE" ]]; then
+  perl -i -pe "s/versionCode\\s+\\d+/versionCode ${MOBILE_CODE}/; s/versionName\\s+\\\"[^\\\"]+\\\"/versionName \\\"${MOBILE_VERSION}\\\"/" "$GRADLE"
+fi
+
 (
   cd android
   ./gradlew assembleDebug
@@ -124,6 +132,11 @@ fi
 
 APK="$ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
 mkdir -p "$ROOT/artifacts"
+OUT="$ROOT/artifacts/handcash-mobile-${MOBILE_VERSION}.apk"
+cp "$APK" "$OUT"
 cp "$APK" "$ROOT/artifacts/handcash-mobile-debug.apk"
-echo "APK ready: $ROOT/artifacts/handcash-mobile-debug.apk"
-ls -la "$ROOT/artifacts/handcash-mobile-debug.apk"
+SHA="$(shasum -a 256 "$OUT" | awk '{print $1}')"
+echo "$SHA  $(basename "$OUT")" | tee "$OUT.sha256"
+echo "APK ready: $OUT"
+echo "SHA-256: $SHA"
+ls -la "$OUT" "$ROOT/artifacts/handcash-mobile-debug.apk"
