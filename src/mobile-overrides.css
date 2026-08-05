@@ -208,13 +208,6 @@ html.platform-mobile .nav-child-body {
   -webkit-overflow-scrolling: touch;
 }
 
-html.platform-mobile .nav-breadcrumb-head {
-  background: color-mix(in srgb, #0a0f0d 96%, transparent);
-  padding-bottom: 4px;
-  margin-bottom: 6px;
-  min-height: 24px;
-}
-
 html.platform-mobile .connected-panel-head,
 html.platform-mobile .panel-label-bar {
   position: sticky;
