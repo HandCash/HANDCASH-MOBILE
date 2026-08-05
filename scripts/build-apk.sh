@@ -120,7 +120,7 @@ fi
 # Stamp app version after Capacitor sync (android/ is often regenerated).
 GRADLE="$ROOT/android/app/build.gradle"
 MOBILE_VERSION="$(node -p "require('./package.json').version")"
-MOBILE_CODE="$(node -p "const v=require('./package.json').version.split('.').map(Number); console.log(v[0]*10000+v[1]*100+v[2])")"
+MOBILE_CODE="$(node -p "(() => { const v=require('./package.json').version.split('.').map(Number); return v[0]*10000+v[1]*100+v[2]; })()")"
 if [[ -f "$GRADLE" ]]; then
   perl -i -pe "s/versionCode\\s+\\d+/versionCode ${MOBILE_CODE}/; s/versionName\\s+\\\"[^\\\"]+\\\"/versionName \\\"${MOBILE_VERSION}\\\"/; s/^undefined\\s*$//" "$GRADLE"
 fi
