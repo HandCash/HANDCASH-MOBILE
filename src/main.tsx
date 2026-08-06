@@ -6,9 +6,11 @@ import '@aeon-ui/panda/electron.css'
 import '@desktop/styles/handcash.css'
 import './mobile-overrides.css'
 import { installMobileBridge } from './bridge'
+import { installBackgroundRuntime } from './backgroundRuntime'
 import { App } from '@desktop/App'
 
 installMobileBridge()
+installBackgroundRuntime()
 
 applyBrandPalette(
   {

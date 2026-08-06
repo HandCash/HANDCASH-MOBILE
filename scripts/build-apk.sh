@@ -86,6 +86,12 @@ if [[ -f "$MANIFEST" ]]; then
   if ! grep -q 'USE_BIOMETRIC' "$MANIFEST"; then
     perl -i -0pe 's|(<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />)|$1\n    <uses-permission android:name="android.permission.USE_BIOMETRIC" />\n    <uses-permission android:name="android.permission.USE_FINGERPRINT" />|' "$MANIFEST"
   fi
+  if ! grep -q 'FOREGROUND_SERVICE_DATA_SYNC' "$MANIFEST"; then
+    perl -i -0pe 's|(<uses-permission android:name="android.permission.USE_FINGERPRINT" />)|$1\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />|' "$MANIFEST"
+  fi
+  if ! grep -q 'AndroidForegroundService' "$MANIFEST"; then
+    perl -i -0pe 's|</application>|        <receiver android:name="io.capawesome.capacitorjs.plugins.foregroundservice.NotificationActionBroadcastReceiver" android:exported="false" />\n        <service android:name="io.capawesome.capacitorjs.plugins.foregroundservice.AndroidForegroundService" android:exported="false" android:foregroundServiceType="dataSync" />\n    </application>|' "$MANIFEST"
+  fi
   if ! grep -q 'usesCleartextTraffic' "$MANIFEST"; then
     perl -i -pe 's|<application|<application android:usesCleartextTraffic="true"|' "$MANIFEST"
   fi
