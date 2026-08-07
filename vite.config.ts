@@ -39,10 +39,12 @@ export default defineConfig({
       // node_modules may be absent during a parallel/clean mobile-only build).
       // Exact-match only — prefix aliases break @bsv/sdk package exports
       // (e.g. @bsv/sdk/primitives/AESGCM → dist/esm/...).
+      // Prefer Desktop's pinned+patched 2.4.4 (StorageIdb AbortError mask fix).
+      // Mobile lockfile may float to a bundled 2.4.x without patchable sources.
       {
         find: /^@bsv\/wallet-toolbox-client$/,
         replacement: path.resolve(
-          __dirname,
+          DESKTOP_ROOT,
           'node_modules/@bsv/wallet-toolbox-client',
         ),
       },
