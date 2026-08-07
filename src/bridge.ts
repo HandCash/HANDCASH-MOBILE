@@ -10,6 +10,7 @@ import {
   stopNativeBrc100Bridge,
 } from './brc100LocalBridge'
 import {
+  nativeBringToFront,
   nativeDeviceAuthClear,
   nativeDeviceAuthEnroll,
   nativeDeviceAuthStatus,
@@ -147,7 +148,9 @@ export function installMobileBridge(): void {
         body: response.body,
       })
     },
-    focusWindow: async () => undefined,
+    focusWindow: async () => {
+      await nativeBringToFront()
+    },
     openExternal: async (url: string) => {
       window.open(url, '_blank', 'noopener,noreferrer')
     },

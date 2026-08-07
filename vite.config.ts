@@ -19,6 +19,10 @@ export default defineConfig({
   base: './',
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // Same scrypt-ts shims as Desktop — hardened collectable sends need them.
+    'process.env.NETWORK': JSON.stringify(''),
+    'process.env.BASEURL': JSON.stringify(''),
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production'),
   },
   resolve: {
     alias: [

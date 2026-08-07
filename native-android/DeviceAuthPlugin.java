@@ -1,6 +1,8 @@
 package io.handcash.mobile;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
@@ -107,6 +109,35 @@ public class DeviceAuthPlugin extends Plugin {
     public void clear(PluginCall call) {
         clearStored();
         call.resolve(new JSObject());
+    }
+
+    /**
+     * Bring the wallet to the foreground when a BRC-100 permission prompt is waiting.
+     * Safe no-op when already resumed.
+     */
+    @PluginMethod
+    public void bringToFront(PluginCall call) {
+        Activity activity = getActivity();
+        if (activity == null) {
+            call.reject("No activity");
+            return;
+        }
+        activity.runOnUiThread(() -> {
+            try {
+                Intent intent = new Intent(activity, activity.getClass());
+                intent.addFlags(
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        | Intent.FLAG_ACTIVITY_NEW_TASK
+                );
+                activity.startActivity(intent);
+                activity.setIntent(intent);
+                call.resolve(new JSObject());
+            } catch (Exception e) {
+                Log.w(TAG, "bringToFront failed", e);
+                call.reject(e.getMessage() != null ? e.getMessage() : "bringToFront failed");
+            }
+        });
     }
 
     private boolean canAuthenticate() {

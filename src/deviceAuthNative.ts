@@ -13,6 +13,7 @@ type DeviceAuthPlugin = {
   enroll(options: { password: string }): Promise<{ ok?: boolean }>
   unlock(options?: { reason?: string }): Promise<{ ok?: boolean; password: string }>
   clear(): Promise<void>
+  bringToFront(): Promise<void>
 }
 
 const Native = registerPlugin<DeviceAuthPlugin>('DeviceAuth')
@@ -54,5 +55,14 @@ export async function nativeDeviceAuthClear(): Promise<void> {
     await Native.clear()
   } catch {
     // ignore
+  }
+}
+
+/** Bring MainActivity to the foreground for an incoming permission request. */
+export async function nativeBringToFront(): Promise<void> {
+  try {
+    await Native.bringToFront()
+  } catch {
+    // OEM may block background startActivity — notification path still covers it.
   }
 }

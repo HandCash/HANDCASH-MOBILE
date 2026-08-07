@@ -6,10 +6,13 @@ import {
 } from '@capawesome-team/capacitor-android-foreground-service'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { appendAppLog } from '@desktop/wallet/appLog'
+import { nativeBringToFront } from './deviceAuthNative'
 
 const SYNC_CHANNEL = 'handcash-sync'
 const RECEIVE_CHANNEL = 'handcash-receive'
+const PERMISSION_CHANNEL = 'handcash-permission'
 const FOREGROUND_NOTIFICATION_ID = 15301
+const PERMISSION_NOTIFICATION_ID = 15302
 
 let appActive = true
 let foregroundRunning = false
@@ -34,6 +37,15 @@ async function ensureNotifications(): Promise<boolean> {
       importance: 4,
       visibility: 1,
       vibration: true,
+    })
+    await LocalNotifications.createChannel({
+      id: PERMISSION_CHANNEL,
+      name: 'Permission requests',
+      description: 'Apps requesting wallet access or payments',
+      importance: 5,
+      visibility: 1,
+      vibration: true,
+      sound: 'default',
     })
     notificationsReady = true
     return true
@@ -105,6 +117,35 @@ async function notifyReceive(detail: { title?: string; body?: string }): Promise
   })
 }
 
+async function notifyPermissionRequest(detail: {
+  title?: string
+  origin?: string
+}): Promise<void> {
+  if (!(await ensureNotifications())) return
+  // Always schedule when backgrounded so the user can tap in if bringToFront is blocked.
+  if (appActive) return
+  try {
+    await LocalNotifications.cancel({ notifications: [{ id: PERMISSION_NOTIFICATION_ID }] })
+  } catch {
+    // ignore
+  }
+  const origin = detail.origin?.trim()
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: PERMISSION_NOTIFICATION_ID,
+        title: detail.title?.trim() || 'Wallet request',
+        body: origin
+          ? `${origin} needs your approval in HandCash`
+          : 'An app needs your approval in HandCash',
+        channelId: PERMISSION_CHANNEL,
+        smallIcon: 'ic_stat_handcash',
+        schedule: { at: new Date(Date.now() + 50), allowWhileIdle: true },
+      },
+    ],
+  })
+}
+
 /** Install Android lifecycle, background sync, and notification plumbing once. */
 export function installBackgroundRuntime(): void {
   if (!Capacitor.isNativePlatform()) return
@@ -126,5 +167,16 @@ export function installBackgroundRuntime(): void {
   document.addEventListener('handcash:receive', (event) => {
     const detail = (event as CustomEvent<{ title?: string; body?: string }>).detail ?? {}
     void notifyReceive(detail)
+  })
+  document.addEventListener('handcash:permission-request', (event) => {
+    const detail =
+      (event as CustomEvent<{ title?: string; origin?: string }>).detail ?? {}
+    // focusWindow already runs from Desktop permissions; re-fire for OEM races.
+    void nativeBringToFront()
+    void notifyPermissionRequest(detail)
+  })
+
+  void LocalNotifications.addListener('localNotificationActionPerformed', () => {
+    document.dispatchEvent(new Event('handcash:app-active'))
   })
 }
