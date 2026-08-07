@@ -50,6 +50,15 @@ export default defineConfig({
         find: /^@bsv\/sdk$/,
         replacement: path.resolve(__dirname, 'node_modules/@bsv/sdk'),
       },
+      // Same as Desktop — scrypt-ts Provider extends EventEmitter.
+      {
+        find: /^events$/,
+        replacement: path.resolve(__dirname, 'node_modules/events/events.js'),
+      },
+      {
+        find: /^buffer$/,
+        replacement: path.resolve(__dirname, 'node_modules/buffer/index.js'),
+      },
     ],
     dedupe: [
       'react',
@@ -73,6 +82,8 @@ export default defineConfig({
       '@zxing/library',
       'qrcode',
       'buffer',
+      'events',
+      'scrypt-ts',
     ],
   },
   server: {
