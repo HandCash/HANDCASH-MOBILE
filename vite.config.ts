@@ -72,6 +72,7 @@ export default defineConfig({
       '@zxing/browser',
       '@zxing/library',
       'qrcode',
+      'buffer',
     ],
   },
   server: {
