@@ -171,8 +171,10 @@ export function installBackgroundRuntime(): void {
   document.addEventListener('handcash:permission-request', (event) => {
     const detail =
       (event as CustomEvent<{ title?: string; origin?: string }>).detail ?? {}
-    // focusWindow already runs from Desktop permissions; re-fire for OEM races.
+    // focusWindow already runs from Desktop permissions; re-fire + retry for OEM races.
     void nativeBringToFront()
+    window.setTimeout(() => void nativeBringToFront(), 280)
+    window.setTimeout(() => void nativeBringToFront(), 900)
     void notifyPermissionRequest(detail)
   })
 
