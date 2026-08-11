@@ -31,6 +31,14 @@ export default defineConfig({
   },
   resolve: {
     alias: [
+      // Desktop vendors identiconDataUrl; Mobile's npm aeon-ui-engine pin does not.
+      {
+        find: /^@aeon-ui\/core$/,
+        replacement: path.join(
+          DESKTOP_ROOT,
+          'vendor/aeon-ui-engine/packages/core/src/index.ts',
+        ),
+      },
       ...aeonUiViteAliases(),
       { find: '@', replacement: DESKTOP_SRC },
       // Resolve Desktop app modules from the sibling repo.
