@@ -1,6 +1,6 @@
 {
   "name": "handcash-mobile",
-  "version": "0.1.127",
+  "version": "0.1.128",
   "private": true,
   "description": "HandCash Mobile — same wallet UI as Desktop, Capacitor Android shell.",
   "type": "module",
