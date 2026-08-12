@@ -95,6 +95,9 @@ if [[ -f "$MANIFEST" ]]; then
   if ! grep -q 'usesCleartextTraffic' "$MANIFEST"; then
     perl -i -pe 's|<application|<application android:usesCleartextTraffic="true"|' "$MANIFEST"
   fi
+  if ! grep -q 'windowSoftInputMode' "$MANIFEST"; then
+    perl -i -pe 's|android:launchMode="singleTask"|android:launchMode="singleTask"\n            android:windowSoftInputMode="adjustResize"|' "$MANIFEST"
+  fi
   if grep -q 'android:allowBackup="true"' "$MANIFEST"; then
     perl -i -pe 's|android:allowBackup="true"|android:allowBackup="false"|' "$MANIFEST"
   fi
