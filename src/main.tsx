@@ -9,7 +9,6 @@ import './mobile-overrides.css'
 import { installMobileBridge } from './bridge'
 import { installBackgroundRuntime } from './backgroundRuntime'
 import { App } from '@desktop/App'
-import { installKeyboardInset } from '@desktop/wallet/keyboardInset'
 
 installMobileBridge()
 installBackgroundRuntime()
@@ -34,7 +33,6 @@ applyBrandPalette(
 
 document.documentElement.classList.add('platform-mobile')
 document.documentElement.dataset.aeonPlatform = window.handcash?.platform || 'android'
-installKeyboardInset()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
