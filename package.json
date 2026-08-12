@@ -1,18 +1,12 @@
 {
   "name": "handcash-mobile",
-  "version": "0.1.169",
+  "version": "0.1.170",
   "private": true,
-  "description": "HandCash Mobile — same wallet UI as Desktop, Capacitor Android shell.",
+  "description": "HandCash Mobile — Capacitor shell over @handcash/wallet-ui (Desktop src).",
   "type": "module",
   "license": "Open BSV License",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "cap:sync": "npm run build && npx cap sync android",
-    "apk": "bash scripts/build-apk.sh"
-  },
   "dependencies": {
+    "@handcash/wallet-ui": "file:../HANDCASH-DESKTOP/packages/wallet-ui",
     "@bsv/sdk": "^2.2.0",
     "@bsv/wallet-toolbox-client": "^2.4.4",
     "@capacitor/android": "^7.4.2",
@@ -34,6 +28,14 @@
     "react-dom": "^19.1.0",
     "scrypt-ts": "^1.4.5",
     "xstate": "^5.19.2"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "cap:sync": "npm run build && npx cap sync android",
+    "apk": "bash scripts/build-apk.sh",
+    "assert:ui-core": "node scripts/assert-ui-core.mjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.4.2",

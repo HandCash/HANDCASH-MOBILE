@@ -56,6 +56,10 @@ yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_H
   "platform-tools" "platforms;android-35" "build-tools;35.0.0" >/tmp/sdkmanager.log || true
 
 npm install
+
+# Fail closed unless sibling Desktop UI core is pinned (version + git SHA).
+node "$ROOT/scripts/assert-ui-core.mjs"
+
 npm run build
 node node_modules/@capacitor/cli/bin/capacitor add android 2>/dev/null || true
 node node_modules/@capacitor/cli/bin/capacitor sync android
@@ -155,6 +159,9 @@ cp "$APK" "$OUT"
 cp "$APK" "$ROOT/artifacts/handcash-mobile-debug.apk"
 SHA="$(shasum -a 256 "$OUT" | awk '{print $1}')"
 echo "$SHA  $(basename "$OUT")" | tee "$OUT.sha256"
+# Re-write pin next to the APK so GH releases can attach the exact Desktop SHA.
+node "$ROOT/scripts/assert-ui-core.mjs" --out "artifacts/ui-core-pin.json"
+cp -f "$ROOT/artifacts/ui-core-pin.json" "$ROOT/artifacts/handcash-mobile-${MOBILE_VERSION}.ui-core-pin.json"
 echo "APK ready: $OUT"
 echo "SHA-256: $SHA"
-ls -la "$OUT" "$ROOT/artifacts/handcash-mobile-debug.apk"
+ls -la "$OUT" "$ROOT/artifacts/handcash-mobile-debug.apk" "$ROOT/artifacts/ui-core-pin.json"

@@ -1,28 +1,34 @@
 # HandCash Mobile
 
-**Same wallet as Desktop** — this app mounts `HANDCASH-DESKTOP/src/App` inside Capacitor with a thin `window.handcash` bridge (localStorage durable prefs, no Electron).
+**Same wallet UI core as Desktop** — this shell mounts `@handcash/wallet-ui` (`HANDCASH-DESKTOP/src`) inside Capacitor with a thin `window.handcash` bridge.
+
+Three parts: **UI core** · **Desktop shell** · **Mobile shell** — see [`../docs/handcash-three-parts.md`](../docs/handcash-three-parts.md).
 
 Requires sibling checkout:
 
 ```
 handcash/
-  HANDCASH-DESKTOP/
-  HANDCASH-MOBILE/   ← you are here
+  HANDCASH-DESKTOP/   ← hosts @handcash/wallet-ui
+  HANDCASH-MOBILE/    ← you are here
 ```
 
 ## Develop
 
 ```bash
 npm install
-npm run dev          # http://localhost:5174 — full Desktop UI
+npm run assert:ui-core   # proves Desktop pin (version + git SHA)
+npm run dev              # http://localhost:5174 — full UI core
 ```
 
 ## APK
 
 ```bash
 bash scripts/build-apk.sh
-# → artifacts/handcash-mobile-debug.apk
+# → artifacts/handcash-mobile-<ver>.apk
+# → artifacts/ui-core-pin.json   (Desktop version + SHA baked into the release)
 ```
+
+Dirty Desktop worktrees fail the build (set `ALLOW_DIRTY_UI_CORE=1` only for local experiments).
 
 Camera permission is required for **Scan to link** (device pair QR) and Dashboard Scan.
 
@@ -40,8 +46,8 @@ QR scanning uses `@zxing/browser` when the WebView has no `BarcodeDetector` (typ
 
 | Feature | Mobile |
 |---------|--------|
-| UI / vault / backups / identity handoff | Same Desktop code (BRC-75 phrase / BRC-140 shares) |
-| Device link (scan QR + BRC-39 sync) | Same Desktop pair UX; camera via zxing fallback |
+| UI / vault / backups / identity handoff | Same UI core (BRC-75 phrase / BRC-140 shares) |
+| Device link (scan QR + BRC-39 sync) | Same pair UX; camera via zxing fallback |
 | BRC-100 LAN bridge | Native loopback `:3321` when the Android app is running |
 | LAN device-peer (`:3340`) | Not yet — cloud History URL is the multi-device path |
 | OS keychain seal | DeviceAuth prefers StrongBox (hardware SE) then TEE; password wrap fallback |

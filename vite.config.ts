@@ -41,6 +41,15 @@ export default defineConfig({
       },
       ...aeonUiViteAliases(),
       { find: '@', replacement: DESKTOP_SRC },
+      // Named UI core — same tree as @desktop (legacy alias kept for gradual migrate).
+      {
+        find: /^@handcash\/wallet-ui\/(.*)/,
+        replacement: path.join(DESKTOP_SRC, '$1'),
+      },
+      {
+        find: /^@handcash\/wallet-ui$/,
+        replacement: path.join(DESKTOP_SRC, 'App.tsx'),
+      },
       // Resolve Desktop app modules from the sibling repo.
       { find: /^@desktop\/(.*)/, replacement: path.join(DESKTOP_SRC, '$1') },
       // Prefer Mobile node_modules when bundling Desktop sources (Desktop
