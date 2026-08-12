@@ -16,8 +16,10 @@ const config: CapacitorConfig = {
       iconColor: '#57ff97',
     },
     Keyboard: {
-      resize: 'body',
-      resizeOnFullScreen: true,
+      // Do not shrink the WebView / flex layouts. Android adjustPan pans the
+      // window; runtime also forces KeyboardResize.None.
+      resize: 'none',
+      resizeOnFullScreen: false,
     },
   },
 }
