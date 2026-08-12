@@ -100,7 +100,12 @@ if [[ -f "$MANIFEST" ]]; then
     perl -i -pe 's|<application|<application android:usesCleartextTraffic="true"|' "$MANIFEST"
   fi
   if ! grep -q 'windowSoftInputMode' "$MANIFEST"; then
-    perl -i -pe 's|android:launchMode="singleTask"|android:launchMode="singleTask"\n            android:windowSoftInputMode="adjustResize"|' "$MANIFEST"
+    # adjustPan shifts the window up — do not adjustResize (that shrinks the
+    # WebView and collapses flex sections like Activity).
+    perl -i -pe 's|android:launchMode="singleTask"|android:launchMode="singleTask"\n            android:windowSoftInputMode="adjustPan"|' "$MANIFEST"
+  else
+    # Cap sync / older builds may still stamp adjustResize — force pan.
+    perl -i -pe 's|android:windowSoftInputMode="adjustResize"|android:windowSoftInputMode="adjustPan"|' "$MANIFEST"
   fi
   if grep -q 'android:allowBackup="true"' "$MANIFEST"; then
     perl -i -pe 's|android:allowBackup="true"|android:allowBackup="false"|' "$MANIFEST"

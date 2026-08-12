@@ -1,5 +1,7 @@
 /**
- * Capacitor Keyboard → CSS inset so sticky bars stay above the soft keyboard.
+ * Capacitor Keyboard — scroll focused fields; do not resize/shrink the WebView.
+ * Android soft input is adjustPan (set in build-apk.sh) so the OS shifts the
+ * window up without compressing flex layouts.
  */
 import { Capacitor } from '@capacitor/core'
 
@@ -8,9 +10,10 @@ export async function installCapacitorKeyboard(): Promise<void> {
   try {
     const { Keyboard, KeyboardResize } = await import('@capacitor/keyboard')
     const { applyCapacitorKeyboardHeight } = await import(
-      '@desktop/wallet/keyboardInset'
+      '@handcash/wallet-ui/wallet/keyboardInset'
     )
-    await Keyboard.setResizeMode({ mode: KeyboardResize.Body }).catch(() => {})
+    // None: leave layout height alone. SoftInputMode adjustPan shifts the window.
+    await Keyboard.setResizeMode({ mode: KeyboardResize.None }).catch(() => {})
     await Keyboard.setScroll({ isDisabled: false }).catch(() => {})
     void Keyboard.addListener('keyboardWillShow', (info) => {
       applyCapacitorKeyboardHeight(info.keyboardHeight || 0)
