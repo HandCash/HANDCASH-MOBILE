@@ -3,11 +3,51 @@
 html.platform-mobile,
 html.platform-mobile body {
   overscroll-behavior: none;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 
+html.platform-mobile #root {
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/*
+ * Prefer the visual viewport height when the keyboard is open so adjustResize
+ * and pan both keep the shell inside the visible area (nothing under keyboard).
+ */
 html.platform-mobile .app-shell {
-  min-height: 100dvh;
-  min-height: 100svh;
+  height: var(--vv-height, 100%);
+  max-height: var(--vv-height, 100%);
+  min-height: 0;
+  overflow: hidden;
+  transform: translateY(var(--vv-offset-top, 0px));
+}
+
+html.platform-mobile.keyboard-open .wallet-nav-bar {
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+}
+
+html.platform-mobile .wallet-nav-bar {
+  /* Stay glued to the visible bottom when the OS pans or resizes. */
+  bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px) + var(--keyboard-inset, 0px));
+}
+
+html.platform-mobile .chat-composer,
+html.platform-mobile .send-stage-edit .send-actions,
+html.platform-mobile .send-stage-confirm .send-actions,
+html.platform-mobile .friend-recipient-field {
+  scroll-margin-bottom: calc(5.5rem + var(--keyboard-inset, 0px));
+}
+
+html.platform-mobile .aeonToast__viewport {
+  bottom: calc(
+    4.25rem + env(safe-area-inset-bottom, 0px) + var(--keyboard-inset, 0px)
+  );
 }
 
 html.platform-mobile .titlebar {
@@ -16,12 +56,9 @@ html.platform-mobile .titlebar {
 
 html.platform-mobile .wallet-nav-stage,
 html.platform-mobile .settings-scroll,
-html.platform-mobile .nav-section-body {
+html.platform-mobile .nav-section-body,
+html.platform-mobile .nav-child-body {
   -webkit-overflow-scrolling: touch;
-}
-
-html.platform-mobile .aeonToast__viewport {
-  bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* ── Dashboard: hero → compact BSV row → content ── */
@@ -31,7 +68,7 @@ html.platform-mobile .dashboard {
   width: 100%;
   max-width: none;
   height: 100%;
-  min-height: 100%;
+  min-height: 0;
   gap: 8px;
   overflow: hidden;
   padding-bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px));

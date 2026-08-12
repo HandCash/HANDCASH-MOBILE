@@ -15,6 +15,10 @@ const config: CapacitorConfig = {
       smallIcon: 'ic_stat_handcash',
       iconColor: '#57ff97',
     },
+    Keyboard: {
+      resize: 'body',
+      resizeOnFullScreen: true,
+    },
   },
 }
 
