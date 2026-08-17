@@ -17,6 +17,7 @@ import {
   nativeDeviceAuthUnlock,
 } from './deviceAuthNative'
 import { nativeSaveImageToGallery } from './saveImageNative'
+import { nativeShareText } from './shareTextNative'
 import { formatAppLogs, installAppLogCapture } from '@desktop/wallet/appLog'
 
 type BridgeStatus = {
@@ -212,6 +213,7 @@ export function installMobileBridge(): void {
     clipboardWrite: async (text: string) => {
       await navigator.clipboard.writeText(text)
     },
+    shareText: (payload: { title: string; text: string }) => nativeShareText(payload),
     saveImageFile: async (payload: { filename: string; mime: string; base64: string }) => {
       const result = await nativeSaveImageToGallery(payload)
       if (!result.ok) return { ok: false as const, error: result.error }
