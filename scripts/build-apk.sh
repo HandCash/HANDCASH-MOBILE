@@ -111,8 +111,12 @@ if [[ -f "$MANIFEST" ]]; then
     perl -i -pe 's|android:allowBackup="true"|android:allowBackup="false"|' "$MANIFEST"
   fi
   if ! grep -q 'fullBackupContent' "$MANIFEST"; then
-    perl -i -pe 's|android:allowBackup="false"|android:allowBackup="false"\n        android:fullBackupContent="false"\n        android:dataExtractionRules="@xml/data_extraction_rules"|' "$MANIFEST"
+    # Escape @ for Perl replacement interpolation; otherwise `@xml` is treated
+    # as an array and the generated manifest contains `/data_extraction_rules`.
+    perl -i -pe 's|android:allowBackup="false"|android:allowBackup="false"\n        android:fullBackupContent="false"\n        android:dataExtractionRules="\@xml/data_extraction_rules"|' "$MANIFEST"
   fi
+  # Repair manifests produced by older versions of this script.
+  perl -i -pe 's|android:dataExtractionRules="/data_extraction_rules"|android:dataExtractionRules="\@xml/data_extraction_rules"|' "$MANIFEST"
 fi
 
 RULES="$ROOT/android/app/src/main/res/xml/data_extraction_rules.xml"
