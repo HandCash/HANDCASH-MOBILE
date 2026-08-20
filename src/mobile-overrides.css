@@ -457,10 +457,6 @@ html.platform-mobile .wallet-nav-tab[data-selected]::after {
     max-width: min(100%, 360px);
   }
 
-  html.platform-mobile .qr-scanner-view {
-    min-height: 320px;
-  }
-
   html.platform-mobile .send-collectable-panel .send-layout {
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   }
