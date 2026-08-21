@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(Brc100LocalBridgePlugin.class);
+        registerPlugin(DappBrowserPlugin.class);
         registerPlugin(DeviceAuthPlugin.class);
         registerPlugin(SaveImagePlugin.class);
         registerPlugin(ShareTextPlugin.class);

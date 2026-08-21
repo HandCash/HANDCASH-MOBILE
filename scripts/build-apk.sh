@@ -93,11 +93,21 @@ if [[ -f "$MANIFEST" ]]; then
   if ! grep -q 'FOREGROUND_SERVICE_DATA_SYNC' "$MANIFEST"; then
     perl -i -0pe 's|(<uses-permission android:name="android.permission.USE_FINGERPRINT" />)|$1\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />|' "$MANIFEST"
   fi
+  # In-app BRC-100 browser (DappBrowserActivity). Not exported: only the wallet
+  # renderer may open it, via DappBrowserPlugin.
+  if ! grep -q 'DappBrowserActivity' "$MANIFEST"; then
+    perl -i -0pe 's{(\s*)<provider}{$1<activity\n            android:name=".DappBrowserActivity"\n            android:exported="false"\n            android:label="\@string/app_name"\n            android:theme="\@android:style/Theme.Material.NoActionBar"\n            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"\n            android:windowSoftInputMode="adjustResize" />\n$1<provider}' "$MANIFEST"
+  fi
   if ! grep -q 'AndroidForegroundService' "$MANIFEST"; then
     perl -i -0pe 's|</application>|        <receiver android:name="io.capawesome.capacitorjs.plugins.foregroundservice.NotificationActionBroadcastReceiver" android:exported="false" />\n        <service android:name="io.capawesome.capacitorjs.plugins.foregroundservice.AndroidForegroundService" android:exported="false" android:foregroundServiceType="dataSync" />\n    </application>|' "$MANIFEST"
   fi
   if ! grep -q 'usesCleartextTraffic' "$MANIFEST"; then
     perl -i -pe 's|<application|<application android:usesCleartextTraffic="true"|' "$MANIFEST"
+  fi
+  # BRC-125 PeerPay links open Send prefilled (src/deepLinks.ts). Only schemes
+  # the wallet parses are claimed; routeWalletDeepLink refuses the rest.
+  if ! grep -q 'android:scheme="peerpay"' "$MANIFEST"; then
+    perl -i -0pe 's|(\s*)</activity>|$1    <intent-filter>\n                <action android:name="android.intent.action.VIEW" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <category android:name="android.intent.category.BROWSABLE" />\n                <data android:scheme="peerpay" />\n            </intent-filter>\n$1</activity>|' "$MANIFEST"
   fi
   if ! grep -q 'windowSoftInputMode' "$MANIFEST"; then
     # adjustPan shifts the window up — do not adjustResize (that shrinks the

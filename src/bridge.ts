@@ -16,6 +16,7 @@ import {
   nativeDeviceAuthStatus,
   nativeDeviceAuthUnlock,
 } from './deviceAuthNative'
+import { nativeOpenDappBrowser } from './dappBrowserNative'
 import { nativeSaveImageToGallery } from './saveImageNative'
 import { nativeShareText } from './shareTextNative'
 import { formatAppLogs, installAppLogCapture } from '@desktop/wallet/appLog'
@@ -156,6 +157,9 @@ export function installMobileBridge(): void {
     openExternal: async (url: string) => {
       window.open(url, '_blank', 'noopener,noreferrer')
     },
+    // A phone browser cannot reach loopback:3321, so BRC-100 apps run in the
+    // wallet's own in-app browser instead of being handed to Chrome.
+    openAppBrowser: (url: string) => nativeOpenDappBrowser(url),
     getLogInfo: async () => ({ file: null, dir: null }),
     openLogs: async () => ({ ok: false as const, error: 'Finder reveal is Desktop-only' }),
     readLogs: async () => {

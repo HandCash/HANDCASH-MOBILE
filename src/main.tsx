@@ -11,6 +11,7 @@ import { installBackgroundRuntime } from './backgroundRuntime'
 import { App } from '@handcash/wallet-ui/App'
 import { installKeyboardInset } from '@handcash/wallet-ui/wallet/keyboardInset'
 import { installCapacitorKeyboard } from './capacitorKeyboard'
+import { installDeepLinks } from './deepLinks'
 
 installMobileBridge()
 installBackgroundRuntime()
@@ -43,3 +44,7 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+// After render: a link routes through the nav store, which the mounted App is
+// already subscribed to (a locked wallet still gates the screen).
+installDeepLinks()
