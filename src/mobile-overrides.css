@@ -233,25 +233,34 @@ html.platform-mobile .panel-label-bar {
   position: sticky;
   top: 0;
   z-index: 6;
+  margin-bottom: 4px;
+}
+
+/* Apps open via Scan / deep links — not an inline URL field on this tab. */
+html.platform-mobile .app-browser-launcher {
+  display: none;
 }
 
 html.platform-mobile .wallet-nav-stage:has(.empty-state) {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 html.platform-mobile .wallet-nav-stage:has(.empty-state) > .wallet-nav-panel,
 html.platform-mobile .nav-section-body:has(> .empty-state) {
   flex: 1 1 auto;
-  min-height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 html.platform-mobile .empty-state {
   flex: 1 1 auto;
-  min-height: 100%;
+  min-height: 0;
   place-content: center;
+  padding: 16px 14px;
 }
 
 /* Compact BSV ticker: logo/name | sparkline | price */

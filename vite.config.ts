@@ -6,7 +6,13 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const DESKTOP_ROOT = path.resolve(__dirname, '../HANDCASH-DESKTOP')
+const desktopCandidates = [
+  path.resolve(__dirname, '../HANDCASH-DESKTOP'),
+  path.resolve(__dirname, '../handcash-brc100'),
+]
+const DESKTOP_ROOT =
+  desktopCandidates.find((p) => fs.existsSync(path.join(p, 'src/App.tsx'))) ??
+  desktopCandidates[0]!
 const DESKTOP_SRC = path.join(DESKTOP_ROOT, 'src')
 
 // Desktop sources ship a Desktop semver constant; the Mobile shell must show its own.

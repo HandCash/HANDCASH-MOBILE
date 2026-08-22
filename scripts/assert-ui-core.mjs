@@ -13,7 +13,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const mobileRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const desktopRoot = path.resolve(mobileRoot, '../HANDCASH-DESKTOP')
+const desktopCandidates = [
+  path.resolve(mobileRoot, '../HANDCASH-DESKTOP'),
+  path.resolve(mobileRoot, '../handcash-brc100'),
+]
+const desktopRoot = desktopCandidates.find((p) => fs.existsSync(p))
 const uiPkgPath = path.join(desktopRoot, 'packages/wallet-ui/package.json')
 const desktopPkgPath = path.join(desktopRoot, 'package.json')
 const mobilePkgPath = path.join(mobileRoot, 'package.json')
@@ -38,8 +42,8 @@ function git(cwd, cmd) {
   }
 }
 
-if (!fs.existsSync(desktopRoot)) {
-  die(`Desktop sibling missing at ${desktopRoot}`)
+if (!desktopRoot) {
+  die(`Desktop sibling missing — expected one of:\n${desktopCandidates.join('\n')}`)
 }
 if (!fs.existsSync(uiPkgPath)) {
   die(`@handcash/wallet-ui missing — expected ${uiPkgPath}`)
