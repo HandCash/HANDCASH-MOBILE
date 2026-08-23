@@ -28,6 +28,23 @@ bash scripts/build-apk.sh
 # → artifacts/ui-core-pin.json   (Desktop version + SHA baked into the release)
 ```
 
+### Mac vs Linux installs
+
+Android refuses an APK when it is signed with a **different key** than the app already on the phone (`App not installed` with no detail). Debug builds use `~/.android/debug.keystore`, which is **different on every machine**.
+
+**One-time setup (recommended):** on the Mac that already installs on your phone:
+
+```bash
+bash scripts/export-lab-keystore.sh
+# copies ~/.android/debug.keystore → native-android/handcash-lab.keystore
+```
+
+Copy `native-android/handcash-lab.keystore` to your Linux box (or commit it for the team). Rebuild — Linux APKs will upgrade Mac installs.
+
+**Quick test:** uninstall HandCash from the phone, then sideload the Linux APK.
+
+Or point at any keystore: `HANDCASH_ANDROID_KEYSTORE=/path/to/debug.keystore bash scripts/build-apk.sh`
+
 Dirty Desktop worktrees fail the build (set `ALLOW_DIRTY_UI_CORE=1` only for local experiments).
 
 Camera permission is required for **Scan to link** (device pair QR) and Dashboard Scan.
