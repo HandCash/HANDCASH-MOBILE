@@ -1,6 +1,6 @@
 {
   "name": "handcash-mobile",
-  "version": "0.1.229",
+  "version": "0.1.230",
   "private": true,
   "description": "HandCash Mobile — Capacitor shell over @handcash/wallet-ui (Desktop src).",
   "type": "module",
@@ -15,7 +15,7 @@
     "@capacitor/local-notifications": "^7.0.7",
     "@capacitor/status-bar": "^7.0.1",
     "@capawesome-team/capacitor-android-foreground-service": "^7.0.1",
-    "@handcash/wallet-ui": "file:../HANDCASH-DESKTOP/packages/wallet-ui",
+    "@handcash/wallet-ui": "file:../handcash-brc100/packages/wallet-ui",
     "@xstate/react": "^5.0.3",
     "@zxing/browser": "^0.1.5",
     "aeon-ui-engine": "^1.3.5",
