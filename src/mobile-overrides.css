@@ -37,6 +37,26 @@ html.platform-mobile .titlebar {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
+/* Light sheet on phone: status-bar inset and chrome must match paper, not the
+   dark Electron defaults or WebView force-dark leftovers. */
+html[data-aeon-mode='light'].platform-mobile body {
+  background: var(--hc-glow);
+  color: var(--hc-text);
+}
+
+html[data-aeon-mode='light'].platform-mobile .titlebar {
+  background: color-mix(in srgb, hsl(var(--background)) 94%, transparent);
+  border-bottom-color: hsl(var(--border));
+}
+
+html[data-aeon-mode='light'].platform-mobile .wallet-nav-stage {
+  background: transparent;
+}
+
+html[data-aeon-mode='light'].platform-mobile .what-is-bsv.panel {
+  box-shadow: var(--shadow-section);
+}
+
 html.platform-mobile .wallet-nav-stage,
 html.platform-mobile .settings-scroll,
 html.platform-mobile .nav-section-body,
@@ -450,6 +470,22 @@ html.platform-mobile .wallet-nav-tab.is-active::after,
 html.platform-mobile .wallet-nav-tab[aria-selected='true']::after,
 html.platform-mobile .wallet-nav-tab[data-selected]::after {
   content: none;
+}
+
+/* Light sheet: the dark nav shadow reads muddy on paper. */
+html[data-aeon-mode='light'].platform-mobile .wallet-nav-bar {
+  background: color-mix(in srgb, hsl(var(--background)) 94%, transparent);
+  border-color: hsl(var(--border));
+  box-shadow:
+    0 4px 16px rgba(15, 23, 42, 0.1),
+    0 0 0 1px color-mix(in srgb, hsl(var(--foreground)) 8%, transparent) inset;
+}
+
+html[data-aeon-mode='light'].platform-mobile .wallet-nav-tab.is-active,
+html[data-aeon-mode='light'].platform-mobile .wallet-nav-tab[aria-selected='true'],
+html[data-aeon-mode='light'].platform-mobile .wallet-nav-tab[data-selected] {
+  color: hsl(var(--primary));
+  background: color-mix(in srgb, hsl(var(--primary)) 10%, transparent);
 }
 
 @media (max-width: 640px) {

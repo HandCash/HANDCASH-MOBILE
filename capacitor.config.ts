@@ -21,6 +21,9 @@ const config: CapacitorConfig = {
       resize: 'none',
       resizeOnFullScreen: false,
     },
+    StatusBar: {
+      overlaysWebView: false,
+    },
   },
 }
 
