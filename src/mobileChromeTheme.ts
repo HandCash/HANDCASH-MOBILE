@@ -36,9 +36,11 @@ async function syncNativeChrome(mode: ResolvedColorMode, color: string): Promise
   try {
     const { StatusBar, Style } = await import('@capacitor/status-bar')
     await StatusBar.setBackgroundColor({ color })
-  // Dark icons on a light sheet; light icons on the black sheet.
+    // `Style` names the background the bar sits on, not the icon colour:
+    // `Style.Light` draws dark icons for a light sheet, `Style.Dark` draws light
+    // icons for the black sheet. Reading them as icon colours inverts both modes.
     await StatusBar.setStyle({
-      style: mode === 'light' ? Style.Dark : Style.Light,
+      style: mode === 'light' ? Style.Light : Style.Dark,
     })
     await StatusBar.show()
   } catch {
