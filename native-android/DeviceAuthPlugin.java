@@ -28,7 +28,6 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.util.concurrent.Executor;
 
@@ -39,10 +38,11 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
 
 /**
- * Biometric-gated unlock: vault password sealed with an Android Keystore AES key.
+ * Device unlock factor: seals a vault DEK with an Android Keystore AES key.
  *
- * Prefers StrongBox (hardware secure element) when the device exposes one;
- * falls back to TEE. The sealing key never leaves secure hardware when available.
+ * Prefer StrongBox when available, else TEE. Authentication allows strong
+ * biometrics and (API 30+) the device PIN/pattern/password — a separate factor
+ * from any in-app HandCash password.
  */
 @CapacitorPlugin(name = "DeviceAuth")
 public class DeviceAuthPlugin extends Plugin {
@@ -51,7 +51,8 @@ public class DeviceAuthPlugin extends Plugin {
     private static final String PREF_CIPHER = "cipher_b64";
     private static final String PREF_IV = "iv_b64";
     private static final String PREF_STRONGBOX = "strongbox";
-    private static final String KEY_ALIAS = "handcash_device_unlock_v2";
+    private static final String KEY_ALIAS = "handcash_device_unlock_v3";
+    private static final String KEY_ALIAS_V2 = "handcash_device_unlock_v2";
     private static final String KEY_ALIAS_LEGACY = "handcash_device_unlock_v1";
     private static final String TRANSFORMATION = "AES/GCM/NoPadding";
 
@@ -67,19 +68,23 @@ public class DeviceAuthPlugin extends Plugin {
         ret.put("available", available);
         ret.put("enrolled", enrolled);
         ret.put("strongBox", strongBox);
-        ret.put("label", strongBox ? "Hardware key" : "Biometrics");
+        ret.put("label", strongBox ? "Fingerprint / device lock" : "Device unlock");
         call.resolve(ret);
     }
 
     @PluginMethod
     public void enroll(PluginCall call) {
-        String password = call.getString("password");
-        if (password == null || password.isEmpty()) {
-            call.reject("Password required");
+        // Accept either "secret" (DEK, preferred) or legacy "password".
+        String secret = call.getString("secret");
+        if (secret == null || secret.isEmpty()) {
+            secret = call.getString("password");
+        }
+        if (secret == null || secret.isEmpty()) {
+            call.reject("Unlock material required");
             return;
         }
         if (!canAuthenticate()) {
-            call.reject("Biometrics are not available on this device");
+            call.reject("Device unlock is not available on this device");
             return;
         }
         FragmentActivity activity = getActivity();
@@ -87,18 +92,19 @@ public class DeviceAuthPlugin extends Plugin {
             call.reject("No activity");
             return;
         }
-        activity.runOnUiThread(() -> promptAndEnroll(call, password));
+        final String toSeal = secret;
+        activity.runOnUiThread(() -> promptAndEnroll(call, toSeal));
     }
 
     @PluginMethod
     public void unlock(PluginCall call) {
         String reason = call.getString("reason", "Unlock HandCash");
         if (!canAuthenticate()) {
-            call.reject("Biometrics are not available");
+            call.reject("Device unlock is not available");
             return;
         }
         if (!hasStoredSecret()) {
-            call.reject("Biometrics are not enabled");
+            call.reject("Device unlock is not enabled");
             return;
         }
         FragmentActivity activity = getActivity();
@@ -192,11 +198,18 @@ public class DeviceAuthPlugin extends Plugin {
         }
     }
 
+    private int allowedAuthenticators() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return BiometricManager.Authenticators.BIOMETRIC_STRONG
+                    | BiometricManager.Authenticators.DEVICE_CREDENTIAL;
+        }
+        return BiometricManager.Authenticators.BIOMETRIC_STRONG;
+    }
+
     private boolean canAuthenticate() {
         try {
             BiometricManager mgr = BiometricManager.from(getContext());
-            // Strong biometrics required — CryptoObject path is incompatible with device PIN alone.
-            int result = mgr.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG);
+            int result = mgr.canAuthenticate(allowedAuthenticators());
             return result == BiometricManager.BIOMETRIC_SUCCESS;
         } catch (Exception e) {
             Log.w(TAG, "canAuthenticate failed", e);
@@ -216,6 +229,7 @@ public class DeviceAuthPlugin extends Plugin {
     private void clearStored() {
         prefs().edit().remove(PREF_CIPHER).remove(PREF_IV).remove(PREF_STRONGBOX).apply();
         deleteAlias(KEY_ALIAS);
+        deleteAlias(KEY_ALIAS_V2);
         deleteAlias(KEY_ALIAS_LEGACY);
     }
 
@@ -229,15 +243,15 @@ public class DeviceAuthPlugin extends Plugin {
         }
     }
 
-    /**
-     * Create (or load) the unlock key. New keys prefer StrongBox; legacy v1
-     * aliases are still readable until the user re-enrolls.
-     */
     private SecretKey getOrCreateKey(boolean createIfMissing) throws Exception {
         KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
         ks.load(null);
         if (ks.containsAlias(KEY_ALIAS)) {
             return (SecretKey) ks.getKey(KEY_ALIAS, null);
+        }
+        // Readable until the user re-enrolls onto the v3 alias.
+        if (ks.containsAlias(KEY_ALIAS_V2)) {
+            return (SecretKey) ks.getKey(KEY_ALIAS_V2, null);
         }
         if (ks.containsAlias(KEY_ALIAS_LEGACY)) {
             return (SecretKey) ks.getKey(KEY_ALIAS_LEGACY, null);
@@ -249,7 +263,6 @@ public class DeviceAuthPlugin extends Plugin {
     }
 
     private SecretKey createKeyPreferStrongBox() throws Exception {
-        // Prefer StrongBox (hardware SE) when the device supports it.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             try {
                 SecretKey key = generateAesKey(true);
@@ -259,7 +272,6 @@ public class DeviceAuthPlugin extends Plugin {
             } catch (StrongBoxUnavailableException e) {
                 Log.i(TAG, "StrongBox unavailable — falling back to TEE", e);
             } catch (Exception e) {
-                // Some OEM keystores throw generic exceptions when StrongBox is missing.
                 Log.i(TAG, "StrongBox request failed — falling back to TEE: " + e.getMessage());
             }
         }
@@ -284,7 +296,8 @@ public class DeviceAuthPlugin extends Plugin {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             builder.setUserAuthenticationParameters(
-                    0, KeyProperties.AUTH_BIOMETRIC_STRONG);
+                    0,
+                    KeyProperties.AUTH_BIOMETRIC_STRONG | KeyProperties.AUTH_DEVICE_CREDENTIAL);
         }
         kg.init(builder.build());
         return kg.generateKey();
@@ -305,7 +318,20 @@ public class DeviceAuthPlugin extends Plugin {
         }
     }
 
-    private void promptAndEnroll(PluginCall call, String password) {
+    private BiometricPrompt.PromptInfo buildPrompt(String title, String subtitle) {
+        BiometricPrompt.PromptInfo.Builder builder =
+                new BiometricPrompt.PromptInfo.Builder()
+                        .setTitle(title)
+                        .setSubtitle(subtitle)
+                        .setAllowedAuthenticators(allowedAuthenticators());
+        // Negative button is incompatible with DEVICE_CREDENTIAL.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            builder.setNegativeButtonText("Cancel");
+        }
+        return builder.build();
+    }
+
+    private void promptAndEnroll(PluginCall call, String secret) {
         try {
             clearStored();
             SecretKey key = getOrCreateKey(true);
@@ -325,7 +351,9 @@ public class DeviceAuthPlugin extends Plugin {
                                         Cipher c = result.getCryptoObject().getCipher();
                                         byte[] iv = c.getIV();
                                         byte[] encrypted =
-                                                c.doFinal(password.getBytes(StandardCharsets.UTF_8));
+                                                c.doFinal(
+                                                        secret.getBytes(
+                                                                java.nio.charset.StandardCharsets.UTF_8));
                                         prefs()
                                                 .edit()
                                                 .putString(
@@ -358,16 +386,10 @@ public class DeviceAuthPlugin extends Plugin {
             String subtitle =
                     strongBox
                             ? "Seal unlock with this device's secure element"
-                            : "Confirm to save unlock for HandCash";
-            BiometricPrompt.PromptInfo info =
-                    new BiometricPrompt.PromptInfo.Builder()
-                            .setTitle("Enable biometric unlock")
-                            .setSubtitle(subtitle)
-                            .setNegativeButtonText("Cancel")
-                            .setAllowedAuthenticators(
-                                    BiometricManager.Authenticators.BIOMETRIC_STRONG)
-                            .build();
-            prompt.authenticate(info, new BiometricPrompt.CryptoObject(cipher));
+                            : "Confirm with fingerprint or device lock";
+            prompt.authenticate(
+                    buildPrompt("Enable device unlock", subtitle),
+                    new BiometricPrompt.CryptoObject(cipher));
         } catch (Exception e) {
             Log.w(TAG, "enroll failed", e);
             call.reject(e.getMessage());
@@ -394,9 +416,13 @@ public class DeviceAuthPlugin extends Plugin {
                                     try {
                                         Cipher c = result.getCryptoObject().getCipher();
                                         byte[] plain = c.doFinal(encrypted);
+                                        String secret =
+                                                new String(plain, java.nio.charset.StandardCharsets.UTF_8);
                                         JSObject ret = new JSObject();
                                         ret.put("ok", true);
-                                        ret.put("password", new String(plain, StandardCharsets.UTF_8));
+                                        ret.put("secret", secret);
+                                        // Legacy field for older JS callers.
+                                        ret.put("password", secret);
                                         call.resolve(ret);
                                     } catch (Exception e) {
                                         Log.w(TAG, "unlock decrypt failed", e);
@@ -414,15 +440,9 @@ public class DeviceAuthPlugin extends Plugin {
                                     // keep prompt open
                                 }
                             });
-            BiometricPrompt.PromptInfo info =
-                    new BiometricPrompt.PromptInfo.Builder()
-                            .setTitle("Unlock HandCash")
-                            .setSubtitle(reason)
-                            .setNegativeButtonText("Use password")
-                            .setAllowedAuthenticators(
-                                    BiometricManager.Authenticators.BIOMETRIC_STRONG)
-                            .build();
-            prompt.authenticate(info, new BiometricPrompt.CryptoObject(cipher));
+            prompt.authenticate(
+                    buildPrompt("Unlock HandCash", reason),
+                    new BiometricPrompt.CryptoObject(cipher));
         } catch (Exception e) {
             Log.w(TAG, "unlock failed", e);
             call.reject(e.getMessage());

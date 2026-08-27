@@ -198,7 +198,7 @@ export function installMobileBridge(): void {
       return status.available
     },
     deviceAuthStatus: () => nativeDeviceAuthStatus(),
-    deviceAuthEnroll: (password: string) => nativeDeviceAuthEnroll(password),
+    deviceAuthEnroll: (secret: string) => nativeDeviceAuthEnroll(secret),
     deviceAuthUnlock: (reason?: string) => nativeDeviceAuthUnlock(reason),
     deviceAuthClear: async () => {
       await nativeDeviceAuthClear()
