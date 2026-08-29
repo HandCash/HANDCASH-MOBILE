@@ -233,6 +233,8 @@ public class Brc100LocalBridgePlugin extends Plugin {
                 bodyBuilder.append(buf, 0, read);
             }
 
+            bringWalletToFront();
+
             if ("OPTIONS".equals(method)) {
                 writeResponse(socket, httpVersion, 204, "");
                 socket.close();
@@ -311,7 +313,6 @@ public class Brc100LocalBridgePlugin extends Plugin {
             event.put("path", path);
             event.put("headers", headersJson);
             event.put("body", bodyBuilder.toString());
-            bringWalletToFront();
             notifyListeners("brc100Request", event);
         } catch (Exception e) {
             Log.w(TAG, "handleClient failed", e);
@@ -324,67 +325,50 @@ public class Brc100LocalBridgePlugin extends Plugin {
 
 
     /**
-     * Chrome talks to loopback :3321; bring MainActivity forward like desktop focusWindow
-     * when a real wallet request is forwarded to JS (not OPTIONS/health/manifest/getVersion).
+     * Foreground the MAIN launcher activity on every inbound :3321 request.
+     * Always posted to the UI thread and started from the application context —
+     * a stopped Activity (background NanoHTTPD/accept thread) makes startActivity
+     * a no-op, which is why Chrome on the phone used to "just send the request".
      */
     private void bringWalletToFront() {
-        final Activity activity = getActivity();
-        final Context context = getContext();
-        if (activity == null && context == null) return;
-        Runnable work = () -> {
+        final Context app;
+        try {
+            Context ctx = getContext();
+            if (ctx == null) {
+                Activity act = getActivity();
+                ctx = act;
+            }
+            app = ctx != null ? ctx.getApplicationContext() : null;
+        } catch (Exception e) {
+            Log.w(TAG, "bringToFront: no context", e);
+            return;
+        }
+        if (app == null) return;
+        new Handler(Looper.getMainLooper()).post(() -> {
             try {
-                Context ctx = activity != null ? activity : context;
-                ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
+                ActivityManager am = (ActivityManager) app.getSystemService(Context.ACTIVITY_SERVICE);
                 if (am != null) {
                     java.util.List<ActivityManager.AppTask> tasks = am.getAppTasks();
                     if (tasks != null && !tasks.isEmpty()) {
                         tasks.get(0).moveToFront();
                     }
                 }
-
-                Activity act = activity != null ? activity : getActivity();
-                if (act != null) {
-                    Intent launch = act.getPackageManager()
-                        .getLaunchIntentForPackage(act.getPackageName());
-                    if (launch != null) {
-                        launch.addFlags(
-                            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                                | Intent.FLAG_ACTIVITY_SINGLE_TOP
-                                | Intent.FLAG_ACTIVITY_NEW_TASK
-                                | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-                        );
-                        act.startActivity(launch);
-                    } else {
-                        Intent intent = new Intent(act, act.getClass());
-                        intent.addFlags(
-                            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                                | Intent.FLAG_ACTIVITY_SINGLE_TOP
-                                | Intent.FLAG_ACTIVITY_NEW_TASK
-                                | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-                        );
-                        act.startActivity(intent);
-                    }
-                } else if (ctx != null) {
-                    Intent launch = ctx.getPackageManager()
-                        .getLaunchIntentForPackage(ctx.getPackageName());
-                    if (launch != null) {
-                        launch.addFlags(
-                            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                                | Intent.FLAG_ACTIVITY_NEW_TASK
-                                | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-                        );
-                        ctx.startActivity(launch);
-                    }
+                Intent launch = app.getPackageManager().getLaunchIntentForPackage(app.getPackageName());
+                if (launch == null) {
+                    launch = new Intent(Intent.ACTION_MAIN);
+                    launch.addCategory(Intent.CATEGORY_LAUNCHER);
+                    launch.setPackage(app.getPackageName());
                 }
+                launch.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                );
+                app.startActivity(launch);
             } catch (Exception e) {
                 Log.w(TAG, "bringToFront failed", e);
             }
-        };
-        if (activity != null) {
-            activity.runOnUiThread(work);
-        } else {
-            new Handler(Looper.getMainLooper()).post(work);
-        }
+        });
     }
 
     private void writeResponse(Socket socket, String httpVersion, int status, String body)
