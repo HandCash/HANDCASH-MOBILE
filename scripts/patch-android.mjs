@@ -50,7 +50,14 @@ function patchManifest(src) {
       `$1\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />`,
     )
   }
+  if (!m.includes('USE_FULL_SCREEN_INTENT')) {
+    m = m.replace(
+      /(<uses-permission android:name="android.permission.POST_NOTIFICATIONS" \/>)/,
+      `$1\n    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />`,
+    )
+  }
   if (!m.includes('DappBrowserActivity')) {
+
     m = m.replace(
       /(\s*)<provider/,
       `$1<activity

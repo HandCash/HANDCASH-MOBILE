@@ -1,12 +1,22 @@
 package io.handcash.mobile;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.WindowManager;
+
+import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -43,6 +53,9 @@ public class Brc100LocalBridgePlugin extends Plugin {
     private static final long REQUEST_TIMEOUT_MS = 120_000L;
     private static final String DISCOVERY_VERSION_JSON =
             "{\"version\":\"HandCash Mobile 0.1.0\"}";
+    private static final String WALLET_REQUEST_CHANNEL = "handcash_wallet_request";
+    private static final int WALLET_REQUEST_NOTIF_ID = 3321;
+    private static final int MINT_COLOR = 0xFFC8FFE0;
 
     private final List<ServerSocket> serverSockets = new ArrayList<>();
     private ExecutorService acceptPool;
@@ -59,6 +72,12 @@ public class Brc100LocalBridgePlugin extends Plugin {
             this.socket = socket;
             this.httpVersion = httpVersion;
         }
+    }
+
+    @Override
+    public void load() {
+        super.load();
+        new Handler(Looper.getMainLooper()).post(this::ensureWalletRequestChannel);
     }
 
     @PluginMethod
@@ -170,6 +189,19 @@ public class Brc100LocalBridgePlugin extends Plugin {
     protected void handleOnDestroy() {
         stopServer();
         super.handleOnDestroy();
+    }
+
+    @Override
+    protected void handleOnResume() {
+        super.handleOnResume();
+        try {
+            Context ctx = getContext();
+            if (ctx == null) return;
+            NotificationManager nm =
+                    (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) nm.cancel(WALLET_REQUEST_NOTIF_ID);
+        } catch (Exception ignored) {
+        }
     }
 
     private void acceptLoop(ServerSocket serverSocket) {
@@ -323,52 +355,170 @@ public class Brc100LocalBridgePlugin extends Plugin {
         }
     }
 
-
     /**
      * Foreground the MAIN launcher activity on every inbound :3321 request.
-     * Always posted to the UI thread and started from the application context —
-     * a stopped Activity (background NanoHTTPD/accept thread) makes startActivity
-     * a no-op, which is why Chrome on the phone used to "just send the request".
+     * Android 10+ blocks background {@code startActivity}; copy DeviceAuth flags
+     * as a first try, then always post a HIGH heads-up with a full-screen intent
+     * so the system is allowed to bring the wallet forward.
      */
     private void bringWalletToFront() {
-        final Context app;
-        try {
-            Context ctx = getContext();
-            if (ctx == null) {
-                Activity act = getActivity();
-                ctx = act;
-            }
-            app = ctx != null ? ctx.getApplicationContext() : null;
-        } catch (Exception e) {
-            Log.w(TAG, "bringToFront: no context", e);
-            return;
-        }
-        if (app == null) return;
         new Handler(Looper.getMainLooper()).post(() -> {
+            Context app = null;
             try {
-                ActivityManager am = (ActivityManager) app.getSystemService(Context.ACTIVITY_SERVICE);
-                if (am != null) {
-                    java.util.List<ActivityManager.AppTask> tasks = am.getAppTasks();
-                    if (tasks != null && !tasks.isEmpty()) {
-                        tasks.get(0).moveToFront();
-                    }
+                Context ctx = getContext();
+                if (ctx == null) {
+                    Activity act = getActivity();
+                    ctx = act;
                 }
-                Intent launch = app.getPackageManager().getLaunchIntentForPackage(app.getPackageName());
-                if (launch == null) {
-                    launch = new Intent(Intent.ACTION_MAIN);
-                    launch.addCategory(Intent.CATEGORY_LAUNCHER);
-                    launch.setPackage(app.getPackageName());
+                app = ctx != null ? ctx.getApplicationContext() : null;
+            } catch (Exception e) {
+                Log.w(TAG, "bringToFront: no context", e);
+            }
+            if (app == null) return;
+            tryStartWalletActivity(app);
+            postWalletRequestHeadsUp(app);
+        });
+    }
+
+    private void tryStartWalletActivity(Context app) {
+        try {
+            ActivityManager am = (ActivityManager) app.getSystemService(Context.ACTIVITY_SERVICE);
+            if (am != null) {
+                java.util.List<ActivityManager.AppTask> tasks = am.getAppTasks();
+                if (tasks != null && !tasks.isEmpty()) {
+                    tasks.get(0).moveToFront();
                 }
-                launch.addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "moveTaskToFront failed", e);
+        }
+
+        Intent launch = walletLaunchIntent(app);
+        Activity act = null;
+        try {
+            act = getActivity();
+        } catch (Exception ignored) {
+        }
+        if (act != null) {
+            try {
+                act.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            } catch (Exception ignored) {
+            }
+            try {
+                act.startActivity(launch);
+                return;
+            } catch (Exception e) {
+                Log.w(TAG, "activity startActivity failed", e);
+            }
+        }
+        try {
+            app.startActivity(launch);
+        } catch (Exception e) {
+            Log.w(TAG, "app startActivity blocked (expected when backgrounded on API 29+)", e);
+        }
+    }
+
+    private Intent walletLaunchIntent(Context app) {
+        Intent launch = app.getPackageManager().getLaunchIntentForPackage(app.getPackageName());
+        if (launch == null) {
+            launch = new Intent(app, MainActivity.class);
+            launch.setAction(Intent.ACTION_MAIN);
+            launch.addCategory(Intent.CATEGORY_LAUNCHER);
+        }
+        launch.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK
                         | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                         | Intent.FLAG_ACTIVITY_SINGLE_TOP
-                );
-                app.startActivity(launch);
-            } catch (Exception e) {
-                Log.w(TAG, "bringToFront failed", e);
+                        | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+        return launch;
+    }
+
+    private void ensureWalletRequestChannel() {
+        Context ctx;
+        try {
+            ctx = getContext();
+        } catch (Exception e) {
+            return;
+        }
+        if (ctx == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationManager nm =
+                    (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                NotificationChannel channel =
+                        new NotificationChannel(
+                                WALLET_REQUEST_CHANNEL,
+                                "Wallet requests",
+                                NotificationManager.IMPORTANCE_HIGH);
+                channel.setDescription("Heads-up when a browser app asks the wallet");
+                channel.setShowBadge(true);
+                channel.enableLights(true);
+                channel.setLightColor(MINT_COLOR);
+                channel.enableVibration(true);
+                try {
+                    channel.setBypassDnd(true);
+                } catch (Exception ignored) {
+                }
+                nm.createNotificationChannel(channel);
             }
-        });
+        }
+        maybeRequestNotificationPermission();
+    }
+
+    private void maybeRequestNotificationPermission() {
+        if (Build.VERSION.SDK_INT < 33) return;
+        Activity act;
+        try {
+            act = getActivity();
+        } catch (Exception e) {
+            return;
+        }
+        if (act == null) return;
+        if (ContextCompat.checkSelfPermission(act, Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        try {
+            act.requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, WALLET_REQUEST_NOTIF_ID);
+        } catch (Exception e) {
+            Log.w(TAG, "POST_NOTIFICATIONS request failed", e);
+        }
+    }
+
+    private void postWalletRequestHeadsUp(Context app) {
+        try {
+            Intent launch = walletLaunchIntent(app);
+            int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                piFlags |= PendingIntent.FLAG_IMMUTABLE;
+            }
+            PendingIntent content =
+                    PendingIntent.getActivity(app, WALLET_REQUEST_NOTIF_ID, launch, piFlags);
+
+            NotificationCompat.Builder builder =
+                    new NotificationCompat.Builder(app, WALLET_REQUEST_CHANNEL)
+                            .setSmallIcon(R.drawable.ic_stat_handcash)
+                            .setContentTitle("HandCash")
+                            .setContentText("Wallet request")
+                            .setPriority(NotificationCompat.PRIORITY_HIGH)
+                            .setCategory(NotificationCompat.CATEGORY_CALL)
+                            .setColor(MINT_COLOR)
+                            .setAutoCancel(true)
+                            .setContentIntent(content)
+                            .setFullScreenIntent(content, true)
+                            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                            .setDefaults(NotificationCompat.DEFAULT_ALL);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                builder.setColorized(true);
+            }
+
+            NotificationManager nm =
+                    (NotificationManager) app.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return;
+            nm.notify(WALLET_REQUEST_NOTIF_ID, builder.build());
+        } catch (Exception e) {
+            Log.w(TAG, "wallet request heads-up failed", e);
+        }
     }
 
     private void writeResponse(Socket socket, String httpVersion, int status, String body)

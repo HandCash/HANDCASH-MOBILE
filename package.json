@@ -1,6 +1,6 @@
 {
   "name": "handcash-mobile",
-  "version": "0.1.249",
+  "version": "0.1.250",
   "private": true,
   "description": "HandCash Mobile \u2014 Capacitor shell over @handcash/wallet-ui (Desktop src).",
   "type": "module",
