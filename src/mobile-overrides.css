@@ -210,25 +210,6 @@ html.platform-mobile .what-is-bsv .bsv-toast-body {
   font-weight: 700;
 }
 
-/* Mobile toasts: always high-contrast black chip with white type. */
-html.platform-mobile .what-is-bsv .bsv-toast-cover,
-html.platform-mobile .what-is-bsv .bsv-toast-cover[data-tone='success'],
-html.platform-mobile .what-is-bsv .bsv-toast-cover[data-tone='error'],
-html.platform-mobile .what-is-bsv .bsv-toast-cover[data-tone='neutral'] {
-  background: #0a0a0a;
-  color: #fafafa;
-}
-
-html.platform-mobile .what-is-bsv .bsv-toast-cover[data-tone='error'] {
-  border: 1px solid color-mix(in srgb, #f87171 55%, #0a0a0a);
-}
-
-html.platform-mobile .what-is-bsv .bsv-toast-cover::before,
-html.platform-mobile .what-is-bsv .bsv-toast-cover::after {
-  opacity: 0.18;
-  mix-blend-mode: soft-light;
-}
-
 /* Identity tab — compact hero + field list (matches Settings / Apps density). */
 html.platform-mobile .identity-nav {
   overflow: hidden;
