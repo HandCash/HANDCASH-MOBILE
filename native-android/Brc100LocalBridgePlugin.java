@@ -1,5 +1,11 @@
 package io.handcash.mobile;
 
+import android.app.Activity;
+import android.app.ActivityManager;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.getcapacitor.JSObject;
@@ -305,6 +311,7 @@ public class Brc100LocalBridgePlugin extends Plugin {
             event.put("path", path);
             event.put("headers", headersJson);
             event.put("body", bodyBuilder.toString());
+            bringWalletToFront();
             notifyListeners("brc100Request", event);
         } catch (Exception e) {
             Log.w(TAG, "handleClient failed", e);
@@ -312,6 +319,71 @@ public class Brc100LocalBridgePlugin extends Plugin {
                 socket.close();
             } catch (IOException ignored) {
             }
+        }
+    }
+
+
+    /**
+     * Chrome talks to loopback :3321; bring MainActivity forward like desktop focusWindow
+     * when a real wallet request is forwarded to JS (not OPTIONS/health/manifest/getVersion).
+     */
+    private void bringWalletToFront() {
+        final Activity activity = getActivity();
+        final Context context = getContext();
+        if (activity == null && context == null) return;
+        Runnable work = () -> {
+            try {
+                Context ctx = activity != null ? activity : context;
+                ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
+                if (am != null) {
+                    java.util.List<ActivityManager.AppTask> tasks = am.getAppTasks();
+                    if (tasks != null && !tasks.isEmpty()) {
+                        tasks.get(0).moveToFront();
+                    }
+                }
+
+                Activity act = activity != null ? activity : getActivity();
+                if (act != null) {
+                    Intent launch = act.getPackageManager()
+                        .getLaunchIntentForPackage(act.getPackageName());
+                    if (launch != null) {
+                        launch.addFlags(
+                            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                                | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                | Intent.FLAG_ACTIVITY_NEW_TASK
+                                | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                        );
+                        act.startActivity(launch);
+                    } else {
+                        Intent intent = new Intent(act, act.getClass());
+                        intent.addFlags(
+                            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                                | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                | Intent.FLAG_ACTIVITY_NEW_TASK
+                                | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                        );
+                        act.startActivity(intent);
+                    }
+                } else if (ctx != null) {
+                    Intent launch = ctx.getPackageManager()
+                        .getLaunchIntentForPackage(ctx.getPackageName());
+                    if (launch != null) {
+                        launch.addFlags(
+                            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                                | Intent.FLAG_ACTIVITY_NEW_TASK
+                                | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                        );
+                        ctx.startActivity(launch);
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "bringToFront failed", e);
+            }
+        };
+        if (activity != null) {
+            activity.runOnUiThread(work);
+        } else {
+            new Handler(Looper.getMainLooper()).post(work);
         }
     }
 

@@ -1,6 +1,7 @@
 import { App as CapacitorApp } from '@capacitor/app'
 import { appendAppLog } from '@desktop/wallet/appLog'
 import { routeWalletDeepLink } from '@desktop/wallet/deepLink'
+import { nativeBringToFront } from './deviceAuthNative'
 
 /**
  * OS links (`peerpay:` today) reach the wallet two ways: the app was already
@@ -18,6 +19,7 @@ export function installDeepLinks(): void {
       return
     }
     appendAppLog('info', `[deep-link] ${source} opened Send`)
+    void nativeBringToFront()
   }
 
   void CapacitorApp.addListener('appUrlOpen', (event) => {

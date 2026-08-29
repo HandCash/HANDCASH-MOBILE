@@ -9,14 +9,9 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 /**
- * Opens a web app in {@link DappBrowserActivity} — an in-app WebView, not the
- * system browser.
- *
- * Why in-app: the page must reach the BRC-100 bridge on loopback:3321, which
- * Chrome blocks from an https page. Why a separate Activity rather than an
- * iframe in the wallet WebView: the page stays a top-level browsing context, so
- * its own cookies are first-party, and the wallet WebView keeps running behind
- * it to answer bridge requests and raise permission prompts.
+ * Opens http(s) in the system browser. This wallet does not host an in-app
+ * browser. Pages talk back through {@code peerpay:} links, which the OS
+ * delivers to MainActivity.
  */
 @CapacitorPlugin(name = "DappBrowser")
 public class DappBrowserPlugin extends Plugin {
@@ -36,14 +31,11 @@ public class DappBrowserPlugin extends Plugin {
             return;
         }
         String scheme = parsed.getScheme() == null ? "" : parsed.getScheme().toLowerCase();
-        // The renderer already decided (decideAppBrowserTarget); refuse again here
-        // so no other caller can hand this Activity a file:// or javascript: URL.
         if (!scheme.equals("https") && !scheme.equals("http")) {
             call.reject("Only http(s) pages can be opened");
             return;
         }
-        Intent intent = new Intent(getContext(), DappBrowserActivity.class);
-        intent.putExtra(DappBrowserActivity.EXTRA_URL, parsed.toString());
+        Intent intent = new Intent(Intent.ACTION_VIEW, parsed);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         getContext().startActivity(intent);
         call.resolve();

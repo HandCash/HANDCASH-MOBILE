@@ -7,9 +7,8 @@ type DappBrowserPlugin = {
 const Native = registerPlugin<DappBrowserPlugin>('DappBrowser')
 
 /**
- * Opens a BRC-100 web app in the in-app WebView (DappBrowserActivity). The
- * wallet WebView keeps running behind it, which is what lets the page reach the
- * bridge on loopback:3321 and lets a permission prompt pull the wallet forward.
+ * Opens http(s) in the system browser. There is no in-app WebView. The page
+ * comes back through a {@code peerpay:} link the OS delivers to the wallet.
  */
 export async function nativeOpenDappBrowser(
   url: string,

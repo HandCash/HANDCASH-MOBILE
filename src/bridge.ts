@@ -157,8 +157,8 @@ export function installMobileBridge(): void {
     openExternal: async (url: string) => {
       window.open(url, '_blank', 'noopener,noreferrer')
     },
-    // A phone browser cannot reach loopback:3321, so BRC-100 apps run in the
-    // wallet's own in-app browser instead of being handed to Chrome.
+    // http(s) opens in the system browser. There is no in-app WebView.
+    // Pages bounce back through peerpay: links the OS delivers here.
     openAppBrowser: (url: string) => nativeOpenDappBrowser(url),
     getLogInfo: async () => ({ file: null, dir: null }),
     openLogs: async () => ({ ok: false as const, error: 'Finder reveal is Desktop-only' }),
