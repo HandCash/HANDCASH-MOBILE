@@ -356,65 +356,73 @@ public class Brc100LocalBridgePlugin extends Plugin {
     }
 
     /**
-     * Foreground the MAIN launcher activity on every inbound :3321 request.
-     * Android 10+ blocks background {@code startActivity}; copy DeviceAuth flags
-     * as a first try, then always post a HIGH heads-up with a full-screen intent
-     * so the system is allowed to bring the wallet forward.
+     * Foreground the wallet on every inbound :3321 request.
+     * Android 10+ blocks background startActivity; prefer the active Activity,
+     * then fall back to the app context, and always surface a heads-up notification.
      */
     private void bringWalletToFront() {
         new Handler(Looper.getMainLooper()).post(() -> {
-            Context app = null;
-            try {
-                Context ctx = getContext();
-                if (ctx == null) {
-                    Activity act = getActivity();
-                    ctx = act;
-                }
-                app = ctx != null ? ctx.getApplicationContext() : null;
-            } catch (Exception e) {
-                Log.w(TAG, "bringToFront: no context", e);
-            }
+            Context app = resolveAppContext();
             if (app == null) return;
+
+            tryMoveTaskToFront(app);
             tryStartWalletActivity(app);
             postWalletRequestHeadsUp(app);
         });
     }
 
-    private void tryStartWalletActivity(Context app) {
+    private Context resolveAppContext() {
+        try {
+            Context ctx = getContext();
+            if (ctx == null) {
+                Activity activity = getActivity();
+                ctx = activity;
+            }
+            return ctx != null ? ctx.getApplicationContext() : null;
+        } catch (Exception e) {
+            Log.w(TAG, "resolveAppContext failed", e);
+            return null;
+        }
+    }
+
+    private void tryMoveTaskToFront(Context app) {
         try {
             ActivityManager am = (ActivityManager) app.getSystemService(Context.ACTIVITY_SERVICE);
-            if (am != null) {
-                java.util.List<ActivityManager.AppTask> tasks = am.getAppTasks();
-                if (tasks != null && !tasks.isEmpty()) {
-                    tasks.get(0).moveToFront();
-                }
+            if (am == null) return;
+            List<ActivityManager.AppTask> tasks = am.getAppTasks();
+            if (tasks != null && !tasks.isEmpty()) {
+                tasks.get(0).moveToFront();
             }
         } catch (Exception e) {
             Log.w(TAG, "moveTaskToFront failed", e);
         }
+    }
 
+    private void tryStartWalletActivity(Context app) {
         Intent launch = walletLaunchIntent(app);
-        Activity act = null;
+        Activity activity = null;
         try {
-            act = getActivity();
+            activity = getActivity();
         } catch (Exception ignored) {
         }
-        if (act != null) {
+
+        if (activity != null) {
             try {
-                act.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             } catch (Exception ignored) {
             }
             try {
-                act.startActivity(launch);
+                activity.startActivity(launch);
                 return;
             } catch (Exception e) {
                 Log.w(TAG, "activity startActivity failed", e);
             }
         }
+
         try {
             app.startActivity(launch);
         } catch (Exception e) {
-            Log.w(TAG, "app startActivity blocked (expected when backgrounded on API 29+)", e);
+            Log.w(TAG, "app startActivity blocked (expected on Android 10+ when backgrounded)", e);
         }
     }
 
