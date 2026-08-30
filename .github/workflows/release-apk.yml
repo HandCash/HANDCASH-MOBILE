@@ -1,0 +1,117 @@
+name: Release Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Git tag to build and upload (for example: v0.1.254). Leave blank to use the package version.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-mobile-${{ github.workflow }}-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout mobile repo
+        uses: actions/checkout@v4
+        with:
+          path: HANDCASH-MOBILE
+          ref: ${{ inputs.tag || github.sha }}
+
+      - name: Checkout Desktop UI core sibling
+        uses: actions/checkout@v4
+        with:
+          repository: HandCash/HANDCASH-DESKTOP
+          path: HANDCASH-DESKTOP
+          ref: master
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: HANDCASH-MOBILE/package-lock.json
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Read release metadata
+        id: meta
+        working-directory: HANDCASH-MOBILE
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          TAG="v${VERSION}"
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Building HandCash Mobile ${VERSION} → release ${TAG}"
+
+      - name: Build APK
+        working-directory: HANDCASH-MOBILE
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash scripts/build-apk.sh
+
+      - name: Ensure GitHub Release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "Release $TAG already exists"
+          else
+            gh release create "$TAG" \
+              --repo "${{ github.repository }}" \
+              --title "HandCash Mobile ${{ steps.meta.outputs.version }}" \
+              --notes "HandCash Mobile ${{ steps.meta.outputs.version }} APK built from CI and pinned to the Desktop UI core SHA." \
+              --prerelease \
+              --target "${{ github.sha }}"
+          fi
+
+      - name: Upload APK and metadata
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: HANDCASH-MOBILE
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          shopt -s nullglob
+          files=(artifacts/*.apk artifacts/*.sha256 artifacts/*.ui-core-pin.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No APK artifacts found under artifacts/" >&2
+            ls -la artifacts/ || true
+            exit 1
+          fi
+
+          for f in "${files[@]}"; do
+            name="$(basename "$f")"
+            gh release delete-asset "$TAG" "$name" --repo "${{ github.repository }}" --yes 2>/dev/null || true
+          done
+
+          gh release upload "$TAG" "${files[@]}" --repo "${{ github.repository }}" --clobber
+          echo "Uploaded to $TAG:"
+          printf '  %s\n' "${files[@]}"
