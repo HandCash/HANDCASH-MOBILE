@@ -25,8 +25,32 @@ html.platform-mobile .wallet-nav-bar {
 html.platform-mobile .chat-composer,
 html.platform-mobile .send-stage-edit .send-actions,
 html.platform-mobile .send-stage-confirm .send-actions,
+html.platform-mobile .burn-forget,
 html.platform-mobile .friend-recipient-field {
   scroll-margin-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/*
+ * Send / burn child panels use height:100% + overflow:hidden on desktop so
+ * stages do not resize between edit → confirm. On phone that clips the tall
+ * confirm stack (breakdown, notes, Forget). Let nav-child-body scroll instead.
+ */
+html.platform-mobile .nav-child-body:has(.send-panel) {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+html.platform-mobile .nav-child-body:has(.send-panel) .send-panel {
+  height: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: visible;
+}
+
+html.platform-mobile .nav-child-body:has(.send-panel) .send-stage {
+  height: auto;
+  flex: 1 0 auto;
+  min-height: 0;
 }
 
 html.platform-mobile .aeonToast__viewport {
@@ -535,7 +559,9 @@ html[data-aeon-mode='light'].platform-mobile .wallet-nav-tab[data-selected] {
     max-width: min(100%, 360px);
   }
 
-  html.platform-mobile .send-collectable-panel .send-layout {
+  html.platform-mobile .send-collectable-panel .send-layout,
+  html.platform-mobile .burn-panel .send-layout,
+  html.platform-mobile .send-fungible-panel .send-layout {
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   }
 
