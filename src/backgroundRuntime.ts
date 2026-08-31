@@ -6,6 +6,7 @@ import {
 } from '@capawesome-team/capacitor-android-foreground-service'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { appendAppLog } from '@desktop/wallet/appLog'
+import { appDisplayName } from '@desktop/wallet/appIdentity'
 import { nativeBringToFront } from './deviceAuthNative'
 
 const SYNC_CHANNEL = 'handcash-sync'
@@ -101,6 +102,14 @@ async function stopForegroundSync(): Promise<void> {
   }
 }
 
+async function dismissPermissionNotification(): Promise<void> {
+  try {
+    await LocalNotifications.cancel({ notifications: [{ id: PERMISSION_NOTIFICATION_ID }] })
+  } catch {
+    // ignore
+  }
+}
+
 async function notifyReceive(detail: { title?: string; body?: string }): Promise<void> {
   if (appActive || !(await ensureNotifications())) return
   await LocalNotifications.schedule({
@@ -120,27 +129,57 @@ async function notifyReceive(detail: { title?: string; body?: string }): Promise
 async function notifyPermissionRequest(detail: {
   title?: string
   origin?: string
+  kind?: string
+  appName?: string
 }): Promise<void> {
   if (!(await ensureNotifications())) return
   // Always schedule when backgrounded so the user can tap in if bringToFront is blocked.
   if (appActive) return
-  try {
-    await LocalNotifications.cancel({ notifications: [{ id: PERMISSION_NOTIFICATION_ID }] })
-  } catch {
-    // ignore
-  }
+  await dismissPermissionNotification()
   const origin = detail.origin?.trim()
+  const appName =
+    detail.appName?.trim() || (origin ? appDisplayName(origin) : '') || 'App'
+  const isConnect = detail.kind === 'connect'
+  const title =
+    detail.title?.trim() || (isConnect ? `Connect to ${appName}` : 'Wallet request')
+  const body = isConnect
+    ? 'Open HandCash to approve'
+    : origin
+      ? `${appName} needs your approval in HandCash`
+      : 'An app needs your approval in HandCash'
   await LocalNotifications.schedule({
     notifications: [
       {
         id: PERMISSION_NOTIFICATION_ID,
-        title: detail.title?.trim() || 'Wallet request',
-        body: origin
-          ? `${origin} needs your approval in HandCash`
-          : 'An app needs your approval in HandCash',
+        title,
+        body,
         channelId: PERMISSION_CHANNEL,
         smallIcon: 'ic_stat_handcash',
         schedule: { at: new Date(Date.now() + 50), allowWhileIdle: true },
+      },
+    ],
+  })
+}
+
+async function notifyWalletConnected(detail: {
+  appName?: string
+  origin?: string
+}): Promise<void> {
+  await dismissPermissionNotification()
+  if (appActive || !(await ensureNotifications())) return
+  const appName =
+    detail.appName?.trim() ||
+    (detail.origin?.trim() ? appDisplayName(detail.origin) : '') ||
+    'app'
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: Math.floor(Date.now() % 2_000_000_000),
+        title: `Wallet connected to ${appName}`,
+        body: 'You can return to the app',
+        channelId: RECEIVE_CHANNEL,
+        smallIcon: 'ic_stat_handcash',
+        schedule: { at: new Date(Date.now() + 100), allowWhileIdle: true },
       },
     ],
   })
@@ -170,12 +209,25 @@ export function installBackgroundRuntime(): void {
   })
   document.addEventListener('handcash:permission-request', (event) => {
     const detail =
-      (event as CustomEvent<{ title?: string; origin?: string }>).detail ?? {}
+      (event as CustomEvent<{
+        title?: string
+        origin?: string
+        kind?: string
+        appName?: string
+      }>).detail ?? {}
     // focusWindow already runs from Desktop permissions; re-fire + retry for OEM races.
     void nativeBringToFront()
     window.setTimeout(() => void nativeBringToFront(), 280)
     window.setTimeout(() => void nativeBringToFront(), 900)
     void notifyPermissionRequest(detail)
+  })
+  document.addEventListener('handcash:wallet-connected', (event) => {
+    const detail =
+      (event as CustomEvent<{ appName?: string; origin?: string }>).detail ?? {}
+    void notifyWalletConnected(detail)
+  })
+  document.addEventListener('handcash:permission-dismissed', () => {
+    void dismissPermissionNotification()
   })
 
   void LocalNotifications.addListener('localNotificationActionPerformed', () => {
