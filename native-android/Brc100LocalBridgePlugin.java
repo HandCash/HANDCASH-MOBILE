@@ -265,7 +265,9 @@ public class Brc100LocalBridgePlugin extends Plugin {
                 bodyBuilder.append(buf, 0, read);
             }
 
-            bringWalletToFront();
+            // Permission UX is driven from JS (permissions.ts → focusWindow +
+            // handcash:permission-request). Do not foreground or notify on every
+            // :3321 call — connected apps poll isAuthenticated/getVersion often.
 
             if ("OPTIONS".equals(method)) {
                 writeResponse(socket, httpVersion, 204, "");

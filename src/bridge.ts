@@ -17,6 +17,16 @@ import {
   nativeDeviceAuthUnlock,
 } from './deviceAuthNative'
 import { nativeOpenDappBrowser } from './dappBrowserNative'
+import {
+  checkMobileUpdates,
+  downloadMobileUpdate,
+  getMobileUpdateStatus,
+  installMobileUpdate,
+  onMobileUpdateStatus,
+  setMobileUpdateMode,
+  startMobileUpdateChecks,
+  type UpdateStatus,
+} from './mobileUpdate'
 import { nativeSaveImageToGallery } from './saveImageNative'
 import { nativeShareText } from './shareTextNative'
 import { formatAppLogs, installAppLogCapture } from '@desktop/wallet/appLog'
@@ -42,16 +52,6 @@ type HttpResponseEvent = {
   body: string
 }
 
-type UpdateStatus = {
-  phase: 'idle' | 'not-available' | 'error'
-  mode: 'none'
-  currentVersion: string
-  availableVersion: string | null
-  percent: number | null
-  error: string | null
-  canInstall: boolean
-}
-
 const VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0'
 
 let bridgeStatus: BridgeStatus = {
@@ -66,18 +66,6 @@ const httpListeners = new Set<(event: HttpRequestEvent) => void>()
 
 function emitBridge() {
   for (const l of bridgeListeners) l(bridgeStatus)
-}
-
-function idleUpdate(): UpdateStatus {
-  return {
-    phase: 'not-available',
-    mode: 'none',
-    currentVersion: VERSION,
-    availableVersion: null,
-    percent: null,
-    error: 'Updates are managed via sideload APK',
-    canInstall: false,
-  }
 }
 
 function detectPlatform(): string {
@@ -228,12 +216,12 @@ export function installMobileBridge(): void {
       error: 'Screenshot copy is Desktop-only',
     }),
     onScreenshotCopied: () => () => undefined,
-    getUpdateStatus: async () => idleUpdate(),
-    checkForUpdates: async () => idleUpdate(),
-    downloadUpdate: async () => idleUpdate(),
-    setUpdateMode: async () => idleUpdate(),
-    installUpdate: async () => undefined,
-    onUpdateStatus: () => () => undefined,
+    getUpdateStatus: async () => getMobileUpdateStatus(),
+    checkForUpdates: async () => checkMobileUpdates({ reason: 'manual' }),
+    downloadUpdate: async () => downloadMobileUpdate(),
+    setUpdateMode: async (mode: 'default' | 'manual' | 'none') => setMobileUpdateMode(mode),
+    installUpdate: async () => installMobileUpdate(),
+    onUpdateStatus: (handler: (status: UpdateStatus) => void) => onMobileUpdateStatus(handler),
   }
 
   Object.defineProperty(window, 'handcash', {
@@ -276,5 +264,6 @@ export function installMobileBridge(): void {
     } else {
       console.warn('[brc100] bridge offline', bridgeStatus.error)
     }
+    startMobileUpdateChecks()
   })()
 }

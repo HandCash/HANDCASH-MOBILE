@@ -12,12 +12,15 @@ import { nativeBringToFront } from './deviceAuthNative'
 const SYNC_CHANNEL = 'handcash-sync'
 const RECEIVE_CHANNEL = 'handcash-receive'
 const PERMISSION_CHANNEL = 'handcash-permission'
+const UPDATE_CHANNEL = 'handcash-update'
 const FOREGROUND_NOTIFICATION_ID = 15301
 const PERMISSION_NOTIFICATION_ID = 15302
+const UPDATE_NOTIFICATION_ID = 15303
 
 let appActive = true
 let foregroundRunning = false
 let notificationsReady = false
+let lastNotifiedUpdateVersion: string | null = null
 
 async function ensureNotifications(): Promise<boolean> {
   if (notificationsReady) return true
@@ -47,6 +50,14 @@ async function ensureNotifications(): Promise<boolean> {
       visibility: 1,
       vibration: true,
       sound: 'default',
+    })
+    await LocalNotifications.createChannel({
+      id: UPDATE_CHANNEL,
+      name: 'App updates',
+      description: 'New HandCash Mobile beta builds',
+      importance: 4,
+      visibility: 1,
+      vibration: true,
     })
     notificationsReady = true
     return true
@@ -126,6 +137,29 @@ async function notifyReceive(detail: { title?: string; body?: string }): Promise
   })
 }
 
+async function notifyUpdateAvailable(detail: {
+  version?: string
+  releaseUrl?: string | null
+}): Promise<void> {
+  const version = detail.version?.trim()
+  if (!version || version === lastNotifiedUpdateVersion) return
+  if (!(await ensureNotifications())) return
+  lastNotifiedUpdateVersion = version
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: UPDATE_NOTIFICATION_ID,
+        title: `HandCash ${version} available`,
+        body: 'Tap to download the latest beta APK',
+        channelId: UPDATE_CHANNEL,
+        smallIcon: 'ic_stat_handcash',
+        schedule: { at: new Date(Date.now() + 100), allowWhileIdle: true },
+        extra: { releaseUrl: detail.releaseUrl ?? null },
+      },
+    ],
+  })
+}
+
 async function notifyPermissionRequest(detail: {
   title?: string
   origin?: string
@@ -133,7 +167,7 @@ async function notifyPermissionRequest(detail: {
   appName?: string
 }): Promise<void> {
   if (!(await ensureNotifications())) return
-  // Always schedule when backgrounded so the user can tap in if bringToFront is blocked.
+  // Only surface when backgrounded — foreground shows the in-app prompt.
   if (appActive) return
   await dismissPermissionNotification()
   const origin = detail.origin?.trim()
@@ -141,12 +175,12 @@ async function notifyPermissionRequest(detail: {
     detail.appName?.trim() || (origin ? appDisplayName(origin) : '') || 'App'
   const isConnect = detail.kind === 'connect'
   const title =
-    detail.title?.trim() || (isConnect ? `Connect to ${appName}` : 'Wallet request')
+    detail.title?.trim() || (isConnect ? `Connect to ${appName}` : `${appName} request`)
   const body = isConnect
     ? 'Open HandCash to approve'
     : origin
       ? `${appName} needs your approval in HandCash`
-      : 'An app needs your approval in HandCash'
+      : 'Open HandCash to approve'
   await LocalNotifications.schedule({
     notifications: [
       {
@@ -229,8 +263,18 @@ export function installBackgroundRuntime(): void {
   document.addEventListener('handcash:permission-dismissed', () => {
     void dismissPermissionNotification()
   })
+  document.addEventListener('handcash:update-available', (event) => {
+    const detail =
+      (event as CustomEvent<{ version?: string; releaseUrl?: string | null }>).detail ?? {}
+    if (appActive) return
+    void notifyUpdateAvailable(detail)
+  })
 
-  void LocalNotifications.addListener('localNotificationActionPerformed', () => {
+  void LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
     document.dispatchEvent(new Event('handcash:app-active'))
+    const releaseUrl = action.notification.extra?.releaseUrl
+    if (typeof releaseUrl === 'string' && releaseUrl.startsWith('http')) {
+      void window.handcash?.openExternal?.(releaseUrl)
+    }
   })
 }
