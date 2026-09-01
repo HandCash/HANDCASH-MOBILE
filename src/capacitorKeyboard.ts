@@ -12,9 +12,12 @@ export async function installCapacitorKeyboard(): Promise<void> {
     const { applyCapacitorKeyboardHeight } = await import(
       '@handcash/wallet-ui/wallet/keyboardInset'
     )
-    // None: leave layout height alone. SoftInputMode adjustPan shifts the window.
-    await Keyboard.setResizeMode({ mode: KeyboardResize.None }).catch(() => {})
-    await Keyboard.setScroll({ isDisabled: false }).catch(() => {})
+    // setResizeMode / setScroll are iOS-only in @capacitor/keyboard — Android
+    // returns UNIMPLEMENTED and pollutes session logs if awaited.
+    if (Capacitor.getPlatform() === 'ios') {
+      await Keyboard.setResizeMode({ mode: KeyboardResize.None }).catch(() => {})
+      await Keyboard.setScroll({ isDisabled: false }).catch(() => {})
+    }
     void Keyboard.addListener('keyboardWillShow', (info) => {
       applyCapacitorKeyboardHeight(info.keyboardHeight || 0)
     })

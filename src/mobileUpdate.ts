@@ -268,13 +268,24 @@ export async function checkMobileUpdates(opts?: {
       })
       return { ...status }
     } catch (err) {
-      setStatus({
-        phase: 'error',
-        availableVersion: null,
-        percent: null,
-        canInstall: false,
-        error: err instanceof Error ? err.message : String(err),
-      })
+      // Auto checks run in the background — do not flash an error toast.
+      if (reason === 'auto') {
+        setStatus({
+          phase: 'idle',
+          availableVersion: null,
+          percent: null,
+          canInstall: false,
+          error: null,
+        })
+      } else {
+        setStatus({
+          phase: 'error',
+          availableVersion: null,
+          percent: null,
+          canInstall: false,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
       return { ...status }
     } finally {
       checkInFlight = null
