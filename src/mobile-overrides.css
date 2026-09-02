@@ -623,6 +623,28 @@ html[data-aeon-mode='light'].platform-mobile .wallet-nav-tab[data-selected] {
   }
 }
 
+/* ── Chat takeover: hide balance hero, fill to top (Friends → Chat) ── */
+html.platform-mobile .dashboard.dashboard--chat-fullscreen {
+  gap: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html.platform-mobile .dashboard.dashboard--chat-fullscreen .wallet-hero {
+  display: none !important;
+}
+
+html.platform-mobile .dashboard.dashboard--chat-fullscreen .wallet-nav-shell {
+  order: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+html.platform-mobile .wallet-nav-shell.wallet-nav-shell--chat-fullscreen .wallet-nav-stage {
+  padding: 0;
+  padding-bottom: 0;
+}
+
 /* ── Nested chat in nav (Friends → Chat) ── */
 html.platform-mobile .chat-shell--nested {
   min-height: 0;
