@@ -332,6 +332,28 @@ html.platform-mobile .wallet-nav-stage:has(.nav-child-stage) > .wallet-nav-panel
   min-height: 0;
 }
 
+html.platform-mobile .wallet-nav-stage:has(.nav-section-with-scroll),
+html.platform-mobile .wallet-nav-stage:has(.settings-with-scroll) {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+html.platform-mobile .wallet-nav-stage:has(.nav-section-with-scroll) > .wallet-nav-panel,
+html.platform-mobile .wallet-nav-stage:has(.settings-with-scroll) > .wallet-nav-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+html.platform-mobile .nav-section-with-scroll .connected-panel-head,
+html.platform-mobile .settings-with-scroll .connected-panel-head,
+html.platform-mobile .settings-with-scroll .settings-panel-head {
+  position: relative;
+  top: auto;
+}
+
 html.platform-mobile .nav-child-body {
   -webkit-overflow-scrolling: touch;
 }
@@ -624,17 +646,18 @@ html.platform-mobile .wallet-nav-shell.wallet-nav-shell--chat-fullscreen .wallet
   padding-bottom: 0;
 }
 
-html.platform-mobile .wallet-nav-shell.wallet-nav-shell--chat-fullscreen .wallet-nav-bar {
-  display: none !important;
-}
-
-html.platform-mobile .chat-shell--fullscreen .chat-topbar {
-  padding-top: env(safe-area-inset-top, 0px);
-  min-height: calc(var(--chat-topbar-h, 52px) + env(safe-area-inset-top, 0px));
-}
-
 html.platform-mobile .chat-shell--fullscreen .chat-composer {
-  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: 10px;
+}
+
+html.platform-mobile .chat-shell--fullscreen[data-aeon-state='thread'] .chat-thread {
+  min-height: 0;
+  overflow: hidden;
+}
+
+html.platform-mobile .nav-section-scroll-body,
+html.platform-mobile .settings-scroll-body {
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Burn in-flight — warm amber, not error red (matches shared handcash.css). */
