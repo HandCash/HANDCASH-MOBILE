@@ -244,6 +244,37 @@ html.platform-mobile .identity-scroll {
   min-height: 0;
 }
 
+/* Settings — pinned "Settings" head; scroll sections underneath (matches Activity). */
+html.platform-mobile .wallet-nav-stage:has(.settings-with-scroll) {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+html.platform-mobile
+  .wallet-nav-stage:has(.settings-with-scroll)
+  > .wallet-nav-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+html.platform-mobile .settings-with-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+html.platform-mobile .settings-scroll-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
 html.platform-mobile .identity-hero {
   gap: 12px;
 }
