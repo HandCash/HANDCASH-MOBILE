@@ -569,3 +569,58 @@ html[data-aeon-mode='light'].platform-mobile .wallet-nav-tab[data-selected] {
     padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* ── Fullscreen chat (shared MessagesPanel · mobile shell layout) ── */
+html.platform-mobile .dashboard.dashboard--chat-fullscreen {
+  gap: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html.platform-mobile .dashboard.dashboard--chat-fullscreen .wallet-hero,
+html.platform-mobile .dashboard.dashboard--chat-fullscreen .what-is-bsv {
+  display: none !important;
+}
+
+html.platform-mobile .dashboard.dashboard--chat-fullscreen .wallet-nav-shell {
+  order: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+html.platform-mobile .wallet-nav-shell.wallet-nav-shell--chat-fullscreen .wallet-nav-stage {
+  padding: 0;
+  padding-bottom: 0;
+}
+
+html.platform-mobile .wallet-nav-shell.wallet-nav-shell--chat-fullscreen .wallet-nav-bar {
+  display: none !important;
+}
+
+html.platform-mobile .chat-shell--fullscreen .chat-topbar {
+  padding-top: env(safe-area-inset-top, 0px);
+  min-height: calc(var(--chat-topbar-h, 52px) + env(safe-area-inset-top, 0px));
+}
+
+html.platform-mobile .chat-shell--fullscreen .chat-composer {
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Burn in-flight — warm amber, not error red (matches shared handcash.css). */
+html.platform-mobile .history-pending-mark.is-burn,
+html.platform-mobile .collectable-sending-mark.is-burn {
+  color: #e8b060;
+  border-color: color-mix(in srgb, #c9852a 55%, hsl(var(--border)));
+  background: color-mix(in srgb, #c9852a 18%, hsl(var(--background)));
+}
+
+html.platform-mobile .collectable-burn-btn.is-burning,
+html.platform-mobile .asset-burn-trigger.is-burning {
+  color: #e8b060;
+  border-color: color-mix(in srgb, #c9852a 55%, transparent);
+  background: color-mix(in srgb, #c9852a 14%, transparent);
+}
+
+html.platform-mobile .collect-token-card[data-sending='true'] .collectable-burn-btn.is-burning {
+  opacity: 1;
+}
