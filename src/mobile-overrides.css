@@ -623,34 +623,17 @@ html[data-aeon-mode='light'].platform-mobile .wallet-nav-tab[data-selected] {
   }
 }
 
-/* ── Fullscreen chat (shared MessagesPanel · mobile shell layout) ── */
-html.platform-mobile .dashboard.dashboard--chat-fullscreen {
-  gap: 0;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-html.platform-mobile .dashboard.dashboard--chat-fullscreen .wallet-hero,
-html.platform-mobile .dashboard.dashboard--chat-fullscreen .what-is-bsv {
-  display: none !important;
-}
-
-html.platform-mobile .dashboard.dashboard--chat-fullscreen .wallet-nav-shell {
-  order: 1;
-  flex: 1 1 auto;
+/* ── Nested chat in nav (Friends → Chat) ── */
+html.platform-mobile .chat-shell--nested {
   min-height: 0;
-  height: auto;
+  flex: 1 1 auto;
 }
 
-html.platform-mobile .wallet-nav-shell.wallet-nav-shell--chat-fullscreen .wallet-nav-stage {
-  padding: 0;
-  padding-bottom: 0;
+html.platform-mobile .chat-shell--nested .chat-composer {
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
 }
 
-html.platform-mobile .chat-shell--fullscreen .chat-composer {
-  padding-bottom: 10px;
-}
-
-html.platform-mobile .chat-shell--fullscreen[data-aeon-state='thread'] .chat-thread {
+html.platform-mobile .chat-shell--nested[data-aeon-state='thread'] .chat-thread {
   min-height: 0;
   overflow: hidden;
 }
