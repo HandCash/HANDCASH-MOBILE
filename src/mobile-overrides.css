@@ -623,29 +623,44 @@ html[data-aeon-mode='light'].platform-mobile .wallet-nav-tab[data-selected] {
   }
 }
 
-/* ── Chat takeover: hide balance hero, fill to top (Friends → Chat) ── */
+/* ── Chat expanded: hide balance + BSV row; nav panel stays in container ── */
 html.platform-mobile .dashboard.dashboard--chat-fullscreen {
-  gap: 0;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  gap: 8px;
 }
 
-html.platform-mobile .dashboard.dashboard--chat-fullscreen .wallet-hero {
+html.platform-mobile .dashboard.dashboard--chat-fullscreen .wallet-hero,
+html.platform-mobile .dashboard.dashboard--chat-fullscreen .what-is-bsv {
   display: none !important;
 }
 
 html.platform-mobile .dashboard.dashboard--chat-fullscreen .wallet-nav-shell {
-  order: 1;
+  order: 3;
   flex: 1 1 auto;
   min-height: 0;
   height: auto;
 }
 
-html.platform-mobile .wallet-nav-shell.wallet-nav-shell--chat-fullscreen .wallet-nav-stage {
-  padding: 0;
-  padding-bottom: 0;
+html.platform-mobile .wallet-nav-stage:has(.chat-with-scroll) {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+html.platform-mobile .wallet-nav-stage:has(.chat-with-scroll) > .wallet-nav-panel.nav-child-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+html.platform-mobile .nav-child-body:has(.chat-with-scroll) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Nested chat in nav (Friends → Chat) ── */
+html.platform-mobile .chat-with-scroll,
 html.platform-mobile .chat-shell--nested {
   min-height: 0;
   flex: 1 1 auto;
