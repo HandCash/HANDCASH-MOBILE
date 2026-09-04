@@ -42,10 +42,16 @@ export function onNativeBrc100Request(
   handler: (event: NativeRequest) => void,
 ): () => void {
   let handle: PluginListenerHandle | undefined
+  let cancelled = false
   void Native.addListener('brc100Request', handler).then((h) => {
+    if (cancelled) {
+      void h.remove()
+      return
+    }
     handle = h
   })
   return () => {
+    cancelled = true
     void handle?.remove()
   }
 }

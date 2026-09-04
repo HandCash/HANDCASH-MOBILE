@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url'
 const mobileRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const desktopCandidates = [
   path.resolve(mobileRoot, '../HANDCASH-DESKTOP'),
+  path.resolve(mobileRoot, '../handcash-desktop'),
   path.resolve(mobileRoot, '../handcash-brc100'),
 ]
 const desktopRoot = desktopCandidates.find((p) => fs.existsSync(p))

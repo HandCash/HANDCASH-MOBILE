@@ -121,19 +121,36 @@ async function dismissPermissionNotification(): Promise<void> {
   }
 }
 
-async function notifyReceive(detail: { title?: string; body?: string }): Promise<void> {
-  if (appActive || !(await ensureNotifications())) return
+async function scheduleLocal(opts: {
+  id: number
+  title: string
+  body: string
+  channelId: string
+  delayMs?: number
+  extra?: Record<string, unknown>
+}): Promise<void> {
   await LocalNotifications.schedule({
     notifications: [
       {
-        id: Math.floor(Date.now() % 2_000_000_000),
-        title: detail.title?.trim() || 'Wallet updated',
-        body: detail.body?.trim() || 'New wallet activity is available',
-        channelId: RECEIVE_CHANNEL,
+        id: opts.id,
+        title: opts.title,
+        body: opts.body,
+        channelId: opts.channelId,
         smallIcon: 'ic_stat_handcash',
-        schedule: { at: new Date(Date.now() + 100), allowWhileIdle: true },
+        schedule: { at: new Date(Date.now() + (opts.delayMs ?? 100)), allowWhileIdle: true },
+        ...(opts.extra ? { extra: opts.extra } : {}),
       },
     ],
+  })
+}
+
+async function notifyReceive(detail: { title?: string; body?: string }): Promise<void> {
+  if (appActive || !(await ensureNotifications())) return
+  await scheduleLocal({
+    id: Math.floor(Date.now() % 2_000_000_000),
+    title: detail.title?.trim() || 'Wallet updated',
+    body: detail.body?.trim() || 'New wallet activity is available',
+    channelId: RECEIVE_CHANNEL,
   })
 }
 
@@ -145,18 +162,12 @@ async function notifyUpdateAvailable(detail: {
   if (!version || version === lastNotifiedUpdateVersion) return
   if (!(await ensureNotifications())) return
   lastNotifiedUpdateVersion = version
-  await LocalNotifications.schedule({
-    notifications: [
-      {
-        id: UPDATE_NOTIFICATION_ID,
-        title: `HandCash ${version} available`,
-        body: 'Tap to download the latest beta APK',
-        channelId: UPDATE_CHANNEL,
-        smallIcon: 'ic_stat_handcash',
-        schedule: { at: new Date(Date.now() + 100), allowWhileIdle: true },
-        extra: { releaseUrl: detail.releaseUrl ?? null },
-      },
-    ],
+  await scheduleLocal({
+    id: UPDATE_NOTIFICATION_ID,
+    title: `HandCash ${version} available`,
+    body: 'Tap to download the latest beta APK',
+    channelId: UPDATE_CHANNEL,
+    extra: { releaseUrl: detail.releaseUrl ?? null },
   })
 }
 
@@ -181,17 +192,12 @@ async function notifyPermissionRequest(detail: {
     : origin
       ? `${appName} needs your approval in HandCash`
       : 'Open HandCash to approve'
-  await LocalNotifications.schedule({
-    notifications: [
-      {
-        id: PERMISSION_NOTIFICATION_ID,
-        title,
-        body,
-        channelId: PERMISSION_CHANNEL,
-        smallIcon: 'ic_stat_handcash',
-        schedule: { at: new Date(Date.now() + 50), allowWhileIdle: true },
-      },
-    ],
+  await scheduleLocal({
+    id: PERMISSION_NOTIFICATION_ID,
+    title,
+    body,
+    channelId: PERMISSION_CHANNEL,
+    delayMs: 50,
   })
 }
 
@@ -205,17 +211,11 @@ async function notifyWalletConnected(detail: {
     detail.appName?.trim() ||
     (detail.origin?.trim() ? appDisplayName(detail.origin) : '') ||
     'app'
-  await LocalNotifications.schedule({
-    notifications: [
-      {
-        id: Math.floor(Date.now() % 2_000_000_000),
-        title: `Wallet connected to ${appName}`,
-        body: 'You can return to the app',
-        channelId: RECEIVE_CHANNEL,
-        smallIcon: 'ic_stat_handcash',
-        schedule: { at: new Date(Date.now() + 100), allowWhileIdle: true },
-      },
-    ],
+  await scheduleLocal({
+    id: Math.floor(Date.now() % 2_000_000_000),
+    title: `Wallet connected to ${appName}`,
+    body: 'You can return to the app',
+    channelId: RECEIVE_CHANNEL,
   })
 }
 

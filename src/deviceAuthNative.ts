@@ -1,4 +1,5 @@
 import { registerPlugin } from '@capacitor/core'
+import { errMsg, wrapOk } from './nativeResult'
 
 type DeviceAuthStatus = {
   available: boolean
@@ -29,12 +30,9 @@ export async function nativeDeviceAuthStatus(): Promise<DeviceAuthStatus> {
 export async function nativeDeviceAuthEnroll(
   secret: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  try {
+  return wrapOk(async () => {
     await Native.enroll({ secret })
-    return { ok: true }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
+  })
 }
 
 export async function nativeDeviceAuthUnlock(
@@ -46,8 +44,7 @@ export async function nativeDeviceAuthUnlock(
     if (!secret) return { ok: false, error: 'No unlock material returned' }
     return { ok: true, secret }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return { ok: false, error: message }
+    return { ok: false, error: errMsg(err) }
   }
 }
 

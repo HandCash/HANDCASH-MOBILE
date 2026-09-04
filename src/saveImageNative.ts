@@ -1,4 +1,5 @@
 import { registerPlugin } from '@capacitor/core'
+import { errMsg } from './nativeResult'
 
 type SaveImagePlugin = {
   saveToGallery(opts: {
@@ -20,9 +21,6 @@ export async function nativeSaveImageToGallery(opts: {
     if (!result?.ok) return { ok: false, error: 'gallery save failed' }
     return { ok: true, path: result.uri }
   } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : String(err),
-    }
+    return { ok: false, error: errMsg(err) }
   }
 }

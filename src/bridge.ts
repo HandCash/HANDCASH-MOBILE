@@ -68,6 +68,16 @@ function emitBridge() {
   for (const l of bridgeListeners) l(bridgeStatus)
 }
 
+/** Apply start/restart result: online when httpUrl is set, else offline with error. */
+function applyBridgeHttpUrl(httpUrl: string | null, offlineError: string): BridgeStatus {
+  bridgeStatus = httpUrl
+    ? { online: true, httpsUrl: '', httpUrl, error: null }
+    : { online: false, httpsUrl: '', httpUrl: '', error: offlineError }
+  injectWebViewWalletHint()
+  emitBridge()
+  return bridgeStatus
+}
+
 function detectPlatform(): string {
   const ua = navigator.userAgent.toLowerCase()
   if (ua.includes('android')) return 'android'
@@ -106,17 +116,7 @@ export function installMobileBridge(): void {
     restartBridge: async () => {
       await stopNativeBrc100Bridge()
       const httpUrl = await startNativeBrc100Bridge()
-      bridgeStatus = httpUrl
-        ? { online: true, httpsUrl: '', httpUrl, error: null }
-        : {
-            online: false,
-            httpsUrl: '',
-            httpUrl: '',
-            error: 'Could not start local BRC-100 bridge',
-          }
-      injectWebViewWalletHint()
-      emitBridge()
-      return bridgeStatus
+      return applyBridgeHttpUrl(httpUrl, 'Could not start local BRC-100 bridge')
     },
     onBridgeStatus: (handler: (status: BridgeStatus) => void) => {
       bridgeListeners.add(handler)
@@ -246,19 +246,12 @@ export function installMobileBridge(): void {
 
   void (async () => {
     const httpUrl = await startNativeBrc100Bridge()
-    bridgeStatus = httpUrl
-      ? { online: true, httpsUrl: '', httpUrl, error: null }
-      : {
-          online: false,
-          httpsUrl: '',
-          httpUrl: '',
-          error:
-            platform === 'web'
-              ? 'Native BRC-100 bridge requires the Android app'
-              : 'Could not bind loopback :3321 (127.0.0.1 / ::1)',
-        }
-    injectWebViewWalletHint()
-    emitBridge()
+    applyBridgeHttpUrl(
+      httpUrl,
+      platform === 'web'
+        ? 'Native BRC-100 bridge requires the Android app'
+        : 'Could not bind loopback :3321 (127.0.0.1 / ::1)',
+    )
     if (bridgeStatus.online) {
       console.info('[brc100] bridge online', bridgeStatus.httpUrl, '(also ::1 for localhost)')
     } else {

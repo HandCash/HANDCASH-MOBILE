@@ -1,4 +1,5 @@
 import { registerPlugin } from '@capacitor/core'
+import { wrapOk } from './nativeResult'
 
 type DappBrowserPlugin = {
   open(options: { url: string }): Promise<void>
@@ -13,10 +14,5 @@ const Native = registerPlugin<DappBrowserPlugin>('DappBrowser')
 export async function nativeOpenDappBrowser(
   url: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  try {
-    await Native.open({ url })
-    return { ok: true }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
+  return wrapOk(() => Native.open({ url }))
 }

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const desktopCandidates = [
   path.resolve(__dirname, '../HANDCASH-DESKTOP'),
+  path.resolve(__dirname, '../handcash-desktop'),
   path.resolve(__dirname, '../handcash-brc100'),
 ]
 const DESKTOP_ROOT =
