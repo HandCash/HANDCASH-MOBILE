@@ -1,8 +1,8 @@
 {
   "name": "handcash-mobile",
-  "version": "0.1.320",
+  "version": "0.1.321",
   "private": true,
-  "description": "HandCash Mobile — Capacitor shell over @handcash/wallet-ui (Desktop src).",
+  "description": "HandCash Mobile \u2014 Capacitor shell over @handcash/wallet-ui (Desktop src).",
   "type": "module",
   "license": "Open BSV License",
   "dependencies": {
