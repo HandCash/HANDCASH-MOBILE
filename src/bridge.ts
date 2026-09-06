@@ -194,10 +194,19 @@ export function installMobileBridge(): void {
     },
     wipeWalletStorage: async () => {
       await nativeDeviceAuthClear()
+      // Keep in sync with HANDCASH-DESKTOP/src/wallet/wipePolicy.ts — wipe must
+      // clear fungibles/BRC-29/remittance caches under handcash.*, not only
+      // handcash.brc100.*, or a new wallet paints the previous King token.
+      const survive = new Set([
+        'handcash.appearance',
+        'handcash.sfx.enabled',
+        'handcash.logs.uploadUrl',
+        'handcash.update.mode',
+      ])
       const keys: string[] = []
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i)
-        if (k?.startsWith('handcash.brc100')) keys.push(k)
+        if (k?.startsWith('handcash.') && !survive.has(k)) keys.push(k)
       }
       for (const k of keys) localStorage.removeItem(k)
       return { removed: keys.length }
