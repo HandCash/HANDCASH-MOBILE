@@ -178,8 +178,9 @@ async function notifyPermissionRequest(detail: {
   appName?: string
 }): Promise<void> {
   if (!(await ensureNotifications())) return
-  // Only surface when backgrounded — foreground shows the in-app prompt.
-  if (appActive) return
+  // Always heads-up for any pending wallet request. Foreground still shows
+  // the in-app prompt; OEMs often leave Chrome on top while HandCash is
+  // "active", so skipping when appActive left users with no notification.
   await dismissPermissionNotification()
   const origin = detail.origin?.trim()
   const appName =
