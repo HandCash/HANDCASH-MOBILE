@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(Brc100LocalBridgePlugin.class);
         registerPlugin(DappBrowserPlugin.class);
         registerPlugin(DeviceAuthPlugin.class);
+        registerPlugin(DirectSessionPlugin.class);
         registerPlugin(SaveImagePlugin.class);
         registerPlugin(ShareTextPlugin.class);
         super.onCreate(savedInstanceState);
