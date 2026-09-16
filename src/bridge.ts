@@ -27,6 +27,7 @@ import {
   startMobileUpdateChecks,
   type UpdateStatus,
 } from './mobileUpdate'
+import { nativeDirectSessionApi } from './directSessionNative'
 import { nativeSaveImageToGallery } from './saveImageNative'
 import { nativeShareText } from './shareTextNative'
 import { formatAppLogs, installAppLogCapture } from '@desktop/wallet/appLog'
@@ -231,6 +232,7 @@ export function installMobileBridge(): void {
     setUpdateMode: async (mode: 'default' | 'manual' | 'none') => setMobileUpdateMode(mode),
     installUpdate: async () => installMobileUpdate(),
     onUpdateStatus: (handler: (status: UpdateStatus) => void) => onMobileUpdateStatus(handler),
+    ...nativeDirectSessionApi(),
   }
 
   Object.defineProperty(window, 'handcash', {
