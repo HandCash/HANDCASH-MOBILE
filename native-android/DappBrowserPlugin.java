@@ -9,9 +9,14 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 /**
- * Opens http(s) in the system browser. This wallet does not host an in-app
- * browser. Pages talk back through {@code peerpay:} links, which the OS
- * delivers to MainActivity.
+ * Opens a BRC-100 web app in {@link DappBrowserActivity} — the wallet's own
+ * in-app browser.
+ *
+ * This used to fire {@code ACTION_VIEW} at the system browser, which left the
+ * finished Activity unreachable and made "Open in-app" indistinguishable from
+ * "Open in browser". The Activity is what carries the CWI bridge to the local
+ * JSON API on :3321, so handing the page to Chrome also dropped the wallet
+ * connection the in-app choice exists to provide.
  */
 @CapacitorPlugin(name = "DappBrowser")
 public class DappBrowserPlugin extends Plugin {
@@ -35,9 +40,13 @@ public class DappBrowserPlugin extends Plugin {
             call.reject("Only http(s) pages can be opened");
             return;
         }
-        Intent intent = new Intent(Intent.ACTION_VIEW, parsed);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        getContext().startActivity(intent);
-        call.resolve();
+        try {
+            Intent intent = new Intent(getContext(), DappBrowserActivity.class);
+            intent.putExtra(DappBrowserActivity.EXTRA_URL, parsed.toString());
+            getActivity().startActivity(intent);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Could not open the in-app browser", e);
+        }
     }
 }
