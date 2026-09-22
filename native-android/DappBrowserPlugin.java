@@ -43,7 +43,13 @@ public class DappBrowserPlugin extends Plugin {
         try {
             Intent intent = new Intent(getContext(), DappBrowserActivity.class);
             intent.putExtra(DappBrowserActivity.EXTRA_URL, parsed.toString());
-            getActivity().startActivity(intent);
+            // One retained browser surface. Reopening the same app raises its
+            // existing WebView instead of creating a blank replacement.
+            intent.addFlags(
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                            | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            | Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
             call.resolve();
         } catch (Exception e) {
             call.reject("Could not open the in-app browser", e);

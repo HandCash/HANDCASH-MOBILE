@@ -63,11 +63,21 @@ function patchManifest(src) {
       `$1<activity
             android:name=".DappBrowserActivity"
             android:exported="false"
+            android:launchMode="singleTask"
             android:label="@string/app_name"
             android:theme="@android:style/Theme.Material.NoActionBar"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
             android:windowSoftInputMode="adjustResize" />
 $1<provider`,
+    )
+  }
+  if (
+    m.includes('DappBrowserActivity') &&
+    !/android:name="\.DappBrowserActivity"[\s\S]*?android:launchMode="singleTask"/.test(m)
+  ) {
+    m = m.replace(
+      /(android:name="\.DappBrowserActivity"\s+android:exported="false")/,
+      '$1\n            android:launchMode="singleTask"',
     )
   }
   if (!m.includes('AndroidForegroundService')) {

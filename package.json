@@ -1,6 +1,6 @@
 {
   "name": "handcash-mobile",
-  "version": "0.1.460",
+  "version": "0.1.461",
   "private": true,
   "description": "HandCash Mobile — Capacitor shell over @handcash/wallet-ui (Desktop src).",
   "type": "module",
@@ -34,7 +34,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test --experimental-strip-types src/mobileUpdateRelease.test.ts",
+    "test": "node --test --experimental-strip-types src/*.test.ts",
     "cap:sync": "npm run build && npx cap sync android",
     "apk": "bash scripts/build-apk.sh",
     "assert:ui-core": "node scripts/assert-ui-core.mjs"

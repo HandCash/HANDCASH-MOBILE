@@ -2,6 +2,7 @@ package io.handcash.mobile;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
@@ -53,6 +54,8 @@ import java.util.concurrent.Executors;
 public class DappBrowserActivity extends Activity {
     public static final String EXTRA_URL = "io.handcash.mobile.DAPP_URL";
     private static final String TAG = "DappBrowser";
+    private static final String PREFS = "handcash_dapp_browser";
+    private static final String PREF_URL = "current_url";
     private static final int BAR_HEIGHT_DP = 52;
     private static final String BRIDGE = "http://127.0.0.1:3321";
     private static final String INJECT =
@@ -72,6 +75,7 @@ public class DappBrowserActivity extends Activity {
     private TextView hostLabel;
     private ProgressBar progress;
     private volatile String pageOriginator = "";
+    private volatile boolean browserInForeground = false;
     private final ExecutorService cwiPool = Executors.newCachedThreadPool();
     private final Handler main = new Handler(Looper.getMainLooper());
 
@@ -82,8 +86,11 @@ public class DappBrowserActivity extends Activity {
 
         String url = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_URL);
         if (url == null || url.trim().isEmpty()) {
-            finish();
-            return;
+            url = getSharedPreferences(PREFS, MODE_PRIVATE).getString(PREF_URL, null);
+            if (url == null || url.trim().isEmpty()) {
+                finish();
+                return;
+            }
         }
 
         LinearLayout root = new LinearLayout(this);
@@ -107,8 +114,7 @@ public class DappBrowserActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         setContentView(root);
-        setHostLabel(url);
-        webView.loadUrl(url);
+        openOrResume(url);
     }
 
     private View buildBar() {
@@ -118,13 +124,15 @@ public class DappBrowserActivity extends Activity {
         bar.setBackgroundColor(Color.parseColor("#0a0a0a"));
         bar.setPadding(dp(8), 0, dp(8), 0);
 
-        Button close = new Button(this);
-        close.setText("Close");
-        close.setAllCaps(false);
-        close.setTextColor(Color.parseColor("#57ff97"));
-        close.setBackgroundColor(Color.TRANSPARENT);
-        close.setOnClickListener(v -> finish());
-        bar.addView(close);
+        Button wallet = new Button(this);
+        wallet.setText("Wallet");
+        wallet.setAllCaps(false);
+        wallet.setTextColor(Color.parseColor("#57ff97"));
+        wallet.setBackgroundColor(Color.TRANSPARENT);
+        // Park, do not destroy. The page, cookies, DOM and navigation history
+        // remain live behind the wallet and are restored on the next launch.
+        wallet.setOnClickListener(v -> bringWalletForward());
+        bar.addView(wallet);
 
         // Anti-phishing: the page cannot style or hide the origin it is served from.
         hostLabel = new TextView(this);
@@ -212,6 +220,12 @@ public class DappBrowserActivity extends Activity {
 
     private void setHostLabel(String url) {
         if (hostLabel == null) return;
+        if (url != null && !url.trim().isEmpty()) {
+            getSharedPreferences(PREFS, MODE_PRIVATE)
+                    .edit()
+                    .putString(PREF_URL, url)
+                    .apply();
+        }
         try {
             Uri parsed = Uri.parse(url);
             String host = parsed.getHost() == null ? url : parsed.getHost();
@@ -223,6 +237,35 @@ public class DappBrowserActivity extends Activity {
             }
         } catch (Exception e) {
             hostLabel.setText(url);
+        }
+    }
+
+    /**
+     * Reopening the same origin resumes the live page. A different connected
+     * app deliberately replaces the one mobile browser surface.
+     */
+    private void openOrResume(String requestedUrl) {
+        if (webView == null || requestedUrl == null || requestedUrl.trim().isEmpty()) return;
+        String liveUrl = webView.getUrl();
+        if (liveUrl != null && sameOrigin(liveUrl, requestedUrl)) {
+            setHostLabel(liveUrl);
+            return;
+        }
+        setHostLabel(requestedUrl);
+        webView.loadUrl(requestedUrl);
+    }
+
+    private boolean sameOrigin(String left, String right) {
+        try {
+            Uri a = Uri.parse(left);
+            Uri b = Uri.parse(right);
+            int aPort = a.getPort() >= 0 ? a.getPort() : ("https".equalsIgnoreCase(a.getScheme()) ? 443 : 80);
+            int bPort = b.getPort() >= 0 ? b.getPort() : ("https".equalsIgnoreCase(b.getScheme()) ? 443 : 80);
+            return String.valueOf(a.getScheme()).equalsIgnoreCase(String.valueOf(b.getScheme()))
+                    && String.valueOf(a.getHost()).equalsIgnoreCase(String.valueOf(b.getHost()))
+                    && aPort == bPort;
+        } catch (Exception ignored) {
+            return false;
         }
     }
 
@@ -240,13 +283,31 @@ public class DappBrowserActivity extends Activity {
         }
     }
 
-    private void deliverCwi(String payload) {
+    /**
+     * A permission request raises MainActivity over this retained browser.
+     * Once the blocked CWI call resolves, put this exact WebView back on top.
+     */
+    private void bringBrowserForward() {
+        try {
+            Intent browser = new Intent(this, DappBrowserActivity.class);
+            browser.addFlags(
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                            | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(browser);
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+        } catch (Exception e) {
+            Log.w(TAG, "bring browser forward failed", e);
+        }
+    }
+
+    private void deliverCwi(String payload, boolean resumeBrowser) {
         WebView view = webView;
         if (view == null) return;
         final String js = "window.postMessage(" + JSONObject.quote(payload) + ", '*');";
         main.post(() -> {
             WebView live = webView;
             if (live != null) live.evaluateJavascript(js, null);
+            if (resumeBrowser && !browserInForeground) bringBrowserForward();
         });
     }
 
@@ -264,6 +325,7 @@ public class DappBrowserActivity extends Activity {
     private void handleCwi(String message) {
         String id = "";
         String call = "";
+        boolean resumeBrowser = false;
         try {
             JSONObject envelope = new JSONObject(message);
             if (!"CWI".equals(envelope.optString("type"))) return;
@@ -275,9 +337,11 @@ public class DappBrowserActivity extends Activity {
             }
             JSONObject args = envelope.optJSONObject("args");
             String body = args == null ? "{}" : args.toString();
-            if (!"getVersion".equals(call)) {
-                main.post(this::bringWalletForward);
-            }
+            // permissions.ts raises MainActivity only when this request really
+            // needs a decision. Remember whether it started in the browser so
+            // the resolved request can return to the same live page.
+            resumeBrowser = browserInForeground && !"getVersion".equals(call);
+            if (resumeBrowser) main.post(this::bringWalletForward);
             String originator = pageOriginator;
             HttpURLConnection conn = (HttpURLConnection) new URL(BRIDGE + "/" + call).openConnection();
             conn.setConnectTimeout(4_000);
@@ -325,7 +389,7 @@ public class DappBrowserActivity extends Activity {
                     reply.put("result", raw);
                 }
             }
-            deliverCwi(reply.toString());
+            deliverCwi(reply.toString(), resumeBrowser);
         } catch (Exception e) {
             Log.w(TAG, "CWI proxy failed", e);
             if (id.isEmpty()) return;
@@ -337,11 +401,31 @@ public class DappBrowserActivity extends Activity {
                 reply.put("status", "error");
                 reply.put("code", "WALLET_BRIDGE_ERROR");
                 reply.put("description", e.getMessage() == null ? "CWI proxy failed" : e.getMessage());
-                deliverCwi(reply.toString());
+                deliverCwi(reply.toString(), resumeBrowser);
             } catch (Exception ignored) {
                 // drop
             }
         }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String url = intent == null ? null : intent.getStringExtra(EXTRA_URL);
+        if (url != null && !url.trim().isEmpty()) openOrResume(url);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        browserInForeground = true;
+    }
+
+    @Override
+    protected void onPause() {
+        browserInForeground = false;
+        super.onPause();
     }
 
     @Override
@@ -350,7 +434,7 @@ public class DappBrowserActivity extends Activity {
             webView.goBack();
             return;
         }
-        super.onBackPressed();
+        bringWalletForward();
     }
 
     @Override
