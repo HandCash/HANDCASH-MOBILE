@@ -166,14 +166,13 @@ export function installMobileBridge(): void {
       error: 'Use embedded QR link on mobile',
     }),
     stopDeviceLink: async () => ({ ok: true as const }),
-    // The shared durableStorage layer already reads/writes localStorage before
-    // consulting this optional shell backend. Mirroring that exact operation
-    // here made every cache write hit WebView storage twice — particularly
-    // visible when background item verification persisted a large inventory.
-    // Mobile has no second origin-independent store, so let durableStorage use
-    // its localStorage fallback once.
-    storageGetSync: () => null,
-    storageSetSync: () => true,
+    // No storageGetSync / storageSetSync on purpose. Mobile has no second
+    // origin-independent store, so WebView storage is the durable store and the
+    // shared durableStorage layer must write to it in full. Answering these with
+    // `null` / `true` to avoid a double write instead made the core treat this
+    // shell as the owner of a file store: every write reported success, values
+    // over the small-key mirror cap reached no store at all, and Activity, chat
+    // and inventory reset on relaunch.
     safeStorageAvailable: async () => {
       const status = await nativeDeviceAuthStatus()
       return status.available
