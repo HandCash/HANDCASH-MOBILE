@@ -146,8 +146,8 @@ export function installMobileBridge(): void {
     openExternal: async (url: string) => {
       window.open(url, '_blank', 'noopener,noreferrer')
     },
-    // http(s) opens in the system browser. There is no in-app WebView.
-    // Pages bounce back through peerpay: links the OS delivers here.
+    // The wallet's own in-app browser (DappBrowserActivity), not Chrome: it
+    // carries the CWI bridge to :3321. `openExternal` is the system browser.
     openAppBrowser: (url: string) => nativeOpenDappBrowser(url),
     getLogInfo: async () => ({ file: null, dir: null }),
     openLogs: async () => ({ ok: false as const, error: 'Finder reveal is Desktop-only' }),
