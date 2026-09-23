@@ -64,6 +64,7 @@ function patchManifest(src) {
             android:name=".DappBrowserActivity"
             android:exported="false"
             android:launchMode="singleTask"
+            android:screenOrientation="portrait"
             android:label="@string/app_name"
             android:theme="@android:style/Theme.Material.NoActionBar"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
@@ -78,6 +79,15 @@ $1<provider`,
     m = m.replace(
       /(android:name="\.DappBrowserActivity"\s+android:exported="false")/,
       '$1\n            android:launchMode="singleTask"',
+    )
+  }
+  if (
+    m.includes('DappBrowserActivity') &&
+    !/android:name="\.DappBrowserActivity"[\s\S]*?android:screenOrientation="portrait"/.test(m)
+  ) {
+    m = m.replace(
+      /(android:name="\.DappBrowserActivity"[\s\S]*?android:launchMode="singleTask")/,
+      '$1\n            android:screenOrientation="portrait"',
     )
   }
   if (!m.includes('AndroidForegroundService')) {

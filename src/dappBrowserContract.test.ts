@@ -14,6 +14,11 @@ test('Open in-app is structurally bound to the retained wallet browser', () => {
   assert.doesNotMatch(plugin, /Intent\.ACTION_VIEW/)
   assert.match(plugin, /FLAG_ACTIVITY_REORDER_TO_FRONT/)
   assert.match(patcher, /android:launchMode="singleTask"/)
+  assert.match(patcher, /android:screenOrientation="portrait"/)
+  assert.match(
+    activity,
+    /setRequestedOrientation\(ActivityInfo\.SCREEN_ORIENTATION_PORTRAIT\)/,
+  )
 })
 
 test('the retained browser preserves its page and returns after wallet requests', () => {
