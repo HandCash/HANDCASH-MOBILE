@@ -23,6 +23,11 @@ const pkg = JSON.parse(
 
 export default defineConfig({
   plugins: [react()],
+  worker: {
+    // Wallet Toolbox 2.13 splits its worker bundle; IIFE cannot represent
+    // Rollup's resulting multi-chunk graph.
+    format: 'es',
+  },
   base: './',
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
@@ -63,8 +68,7 @@ export default defineConfig({
       // node_modules may be absent during a parallel/clean mobile-only build).
       // Exact-match only — prefix aliases break @bsv/sdk package exports
       // (e.g. @bsv/sdk/primitives/AESGCM → dist/esm/...).
-      // Prefer Desktop's pinned+patched 2.4.4 (StorageIdb AbortError mask fix).
-      // Mobile lockfile may float to a bundled 2.4.x without patchable sources.
+      // Prefer Desktop's pinned and custody-patched Toolbox build.
       {
         find: /^@bsv\/wallet-toolbox-client$/,
         replacement: path.resolve(
