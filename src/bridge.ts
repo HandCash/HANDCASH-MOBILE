@@ -17,6 +17,7 @@ import {
   nativeDeviceAuthUnlock,
 } from './deviceAuthNative'
 import { nativeOpenDappBrowser } from './dappBrowserNative'
+import { nativeOpenSystemBrowser } from './systemBrowserNative'
 import {
   checkMobileUpdates,
   downloadMobileUpdate,
@@ -143,7 +144,12 @@ export function installMobileBridge(): void {
     focusWindow: async () => {
       await nativeBringToFront()
     },
+    // Must leave the app, like Desktop's shell.openExternal. `window.open`
+    // from this WebView is not a handoff — Android may swallow it or render
+    // the page in a wallet-owned surface Desktop has no equivalent of.
     openExternal: async (url: string) => {
+      const opened = await nativeOpenSystemBrowser(url)
+      if (opened.ok) return
       window.open(url, '_blank', 'noopener,noreferrer')
     },
     // The wallet's own in-app browser (DappBrowserActivity), not Chrome: it

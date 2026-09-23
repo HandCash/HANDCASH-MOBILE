@@ -3,7 +3,7 @@
  * Mirrors Desktop update.mode (default | manual | none) via the shared UI core.
  */
 
-import { nativeOpenDappBrowser } from './dappBrowserNative'
+import { nativeOpenSystemBrowser } from './systemBrowserNative'
 import {
   selectMobileRelease,
   semverGreaterThan,
@@ -150,8 +150,16 @@ export async function setMobileUpdateMode(mode: UpdateMode): Promise<UpdateStatu
   return { ...status }
 }
 
+/**
+ * The APK goes to the OS download manager, never to the in-app browser.
+ *
+ * `DappBrowserActivity` is a bare WebView with no DownloadListener, so the
+ * download silently produced nothing — and because that Activity persists the
+ * last URL it loaded, the release page then became the page the wallet's app
+ * browser resumed to.
+ */
 async function openApkDownload(release: PendingRelease): Promise<void> {
-  const opened = await nativeOpenDappBrowser(release.apkUrl)
+  const opened = await nativeOpenSystemBrowser(release.apkUrl)
   if (!opened.ok) {
     throw new Error(opened.error || 'Could not open APK download')
   }
