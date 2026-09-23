@@ -2,6 +2,7 @@ package io.handcash.mobile;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.pm.ActivityInfo;
 import android.content.SharedPreferences;
 import android.content.Intent;
 import android.graphics.Color;
@@ -83,6 +84,9 @@ public class DappBrowserActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Match Desktop's narrow, vertical app surface. Dapps commonly switch
+        // to a materially different layout when Android rotates this Activity.
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         String url = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_URL);
         if (url == null || url.trim().isEmpty()) {
