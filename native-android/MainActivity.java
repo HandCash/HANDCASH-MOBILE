@@ -16,6 +16,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(DirectSessionPlugin.class);
         registerPlugin(SaveImagePlugin.class);
         registerPlugin(ShareTextPlugin.class);
+        registerPlugin(SystemBrowserPlugin.class);
         super.onCreate(savedInstanceState);
     }
 

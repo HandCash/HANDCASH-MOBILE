@@ -91,7 +91,7 @@ public class DappBrowserActivity extends Activity {
         String url = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_URL);
         if (url == null || url.trim().isEmpty()) {
             url = getSharedPreferences(PREFS, MODE_PRIVATE).getString(PREF_URL, null);
-            if (url == null || url.trim().isEmpty()) {
+            if (url == null || url.trim().isEmpty() || isDownloadUrl(url)) {
                 finish();
                 return;
             }
@@ -222,9 +222,24 @@ public class DappBrowserActivity extends Activity {
         });
     }
 
+    /**
+     * A file download is never an app page to resume. This WebView registers no
+     * DownloadListener, so such a URL renders nothing and would still become the
+     * page the browser reopens to. The OS owns downloads (SystemBrowserPlugin).
+     */
+    private static boolean isDownloadUrl(String url) {
+        if (url == null) return false;
+        try {
+            String path = Uri.parse(url).getPath();
+            return path != null && path.toLowerCase().endsWith(".apk");
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
     private void setHostLabel(String url) {
         if (hostLabel == null) return;
-        if (url != null && !url.trim().isEmpty()) {
+        if (url != null && !url.trim().isEmpty() && !isDownloadUrl(url)) {
             getSharedPreferences(PREFS, MODE_PRIVATE)
                     .edit()
                     .putString(PREF_URL, url)
