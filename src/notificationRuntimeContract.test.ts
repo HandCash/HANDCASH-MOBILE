@@ -26,6 +26,12 @@ describe('mobile notification runtime', () => {
     assert.match(runtime, /sound: 'default'/)
   })
 
+  it('posts completed spends through the wallet activity channel', () => {
+    assert.match(runtime, /addEventListener\('handcash:spend'/)
+    assert.match(runtime, /runNotification\('spend'/)
+    assert.match(runtime, /kind: 'spend'/)
+  })
+
   it('initializes lifecycle state before suppressing foreground notices', () => {
     assert.match(runtime, /CapacitorApp\.getState\(\)/)
     assert.match(runtime, /appActive = isActive/)
