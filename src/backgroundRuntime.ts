@@ -194,6 +194,26 @@ async function notifyReceive(detail: { title?: string; body?: string }): Promise
   })
 }
 
+async function notifySpend(detail: {
+  title?: string
+  body?: string
+  txid?: string
+  method?: string
+}): Promise<void> {
+  if (appActive || !(await ensureNotifications())) return
+  await scheduleLocal({
+    id: allocateNotificationId(),
+    title: detail.title?.trim() || 'Payment sent',
+    body: detail.body?.trim() || 'Your wallet has been updated',
+    channelId: RECEIVE_CHANNEL,
+    extra: {
+      kind: 'spend',
+      txid: detail.txid ?? null,
+      method: detail.method ?? null,
+    },
+  })
+}
+
 async function notifyUpdateAvailable(detail: {
   version?: string
   releaseUrl?: string | null
@@ -292,6 +312,18 @@ export function installBackgroundRuntime(): void {
   document.addEventListener('handcash:receive', (event) => {
     const detail = (event as CustomEvent<{ title?: string; body?: string }>).detail ?? {}
     runNotification('receive', () => notifyReceive(detail))
+  })
+  document.addEventListener('handcash:spend', (event) => {
+    const detail =
+      (
+        event as CustomEvent<{
+          title?: string
+          body?: string
+          txid?: string
+          method?: string
+        }>
+      ).detail ?? {}
+    runNotification('spend', () => notifySpend(detail))
   })
   document.addEventListener('handcash:permission-request', (event) => {
     const detail =
