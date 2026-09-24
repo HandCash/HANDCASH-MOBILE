@@ -15,6 +15,28 @@ const DESKTOP_ROOT =
   desktopCandidates.find((p) => fs.existsSync(path.join(p, 'src/App.tsx'))) ??
   desktopCandidates[0]!
 const DESKTOP_SRC = path.join(DESKTOP_ROOT, 'src')
+const DESKTOP_AEON = path.join(DESKTOP_ROOT, 'vendor/aeon-ui-engine')
+
+/**
+ * One Aeon engine for both shells.
+ *
+ * `aeonUiViteAliases()` resolves against Mobile's own `aeon-ui-engine` pin,
+ * which drifts from the copy Desktop vendors and develops against. A
+ * Positioner prop added in `vendor/` simply vanished on the phone: the shell
+ * built an engine that had never heard of it, dropped it into the DOM spread,
+ * and fell back to the trigger anchor. Rebase every engine alias onto
+ * Desktop's vendored tree so the two shells cannot diverge again.
+ */
+function desktopAeonAliases() {
+  const marker = `${path.sep}aeon-ui-engine${path.sep}`
+  return aeonUiViteAliases().map((alias) => {
+    const to = String(alias.replacement)
+    const at = to.lastIndexOf(marker)
+    if (at === -1) return alias
+    const rebased = path.join(DESKTOP_AEON, to.slice(at + marker.length))
+    return fs.existsSync(rebased) ? { ...alias, replacement: rebased } : alias
+  })
+}
 
 // Desktop sources ship a Desktop semver constant; the Mobile shell must show its own.
 const pkg = JSON.parse(
@@ -43,15 +65,7 @@ export default defineConfig({
   },
   resolve: {
     alias: [
-      // Desktop vendors identiconDataUrl; Mobile's npm aeon-ui-engine pin does not.
-      {
-        find: /^@aeon-ui\/core$/,
-        replacement: path.join(
-          DESKTOP_ROOT,
-          'vendor/aeon-ui-engine/packages/core/src/index.ts',
-        ),
-      },
-      ...aeonUiViteAliases(),
+      ...desktopAeonAliases(),
       { find: '@', replacement: DESKTOP_SRC },
       // Named UI core — same tree as @desktop (legacy alias kept for gradual migrate).
       {

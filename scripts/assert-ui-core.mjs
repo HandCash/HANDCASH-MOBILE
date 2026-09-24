@@ -78,6 +78,41 @@ if (dirty && !allowDirty) {
   )
 }
 
+/**
+ * The Aeon engine is part of the UI core, so it has to come from the same tree
+ * Desktop builds against. Mobile also carries its own `aeon-ui-engine` pin;
+ * when the aliases resolved to that instead, a Positioner prop added in
+ * Desktop's `vendor/` silently disappeared on the phone — the engine had never
+ * heard of it, so it landed in the DOM spread and the panel anchored to the
+ * wrong element. A drifted engine must fail the build, not ship.
+ */
+function assertAeonEngineFromDesktop() {
+  const entry = path.join(
+    desktopRoot,
+    'vendor/aeon-ui-engine/packages/react/src/index.ts',
+  )
+  if (!fs.existsSync(entry)) {
+    throw new Error(
+      `[ui-core] Desktop does not vendor the Aeon engine at ${entry}`,
+    )
+  }
+  const config = fs.readFileSync(
+    path.join(mobileRoot, 'vite.config.ts'),
+    'utf8',
+  )
+  if (!config.includes('desktopAeonAliases()')) {
+    throw new Error(
+      '[ui-core] vite.config.ts must resolve @aeon-ui/* from Desktop vendor ' +
+        '(desktopAeonAliases); Mobile\'s own aeon-ui-engine pin drifts.',
+    )
+  }
+  console.info(
+    `[ui-core] Aeon engine → ${path.relative(mobileRoot, path.dirname(entry))}`,
+  )
+}
+
+assertAeonEngineFromDesktop()
+
 const pin = {
   schema: 1,
   product: 'handcash-mobile',
