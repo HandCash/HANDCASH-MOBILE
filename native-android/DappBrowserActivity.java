@@ -204,12 +204,14 @@ public class DappBrowserActivity extends Activity {
                     setHostLabel(target.toString());
                     return false;
                 }
-                // Vendor-neutral PeerPay is the only public scheme this wallet claims.
-                if (scheme.equals("peerpay")) {
+                // Vendor-neutral BRC schemes this wallet claims: BRC-125 pay
+                // requests and BRC-29 settlement receipts. Anything else the
+                // page tries is dropped rather than handed to the OS.
+                if (scheme.equals("peerpay") || scheme.equals("brc29")) {
                     try {
                         startActivity(new Intent(Intent.ACTION_VIEW, target));
                     } catch (Exception e) {
-                        Log.w(TAG, "peerpay handoff failed", e);
+                        Log.w(TAG, scheme + " handoff failed", e);
                     }
                 }
                 return true;

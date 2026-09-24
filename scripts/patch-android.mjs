@@ -101,14 +101,18 @@ $1<provider`,
   if (!m.includes('usesCleartextTraffic')) {
     m = m.replace(/<application/, '<application android:usesCleartextTraffic="true"')
   }
-  if (!m.includes('android:scheme="peerpay"')) {
+  // Vendor-neutral BRC schemes the wallet claims from the OS. Must stay in step
+  // with `decideWalletDeepLink` — a scheme declared here but refused there just
+  // launches the app and logs. peerpay: is BRC-125, brc29: is a BRC-29 receipt.
+  for (const scheme of ['peerpay', 'brc29']) {
+    if (m.includes(`android:scheme="${scheme}"`)) continue
     m = m.replace(
       /(\s*)<\/activity>/,
       `$1    <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="peerpay" />
+                <data android:scheme="${scheme}" />
             </intent-filter>
 $1</activity>`,
     )
