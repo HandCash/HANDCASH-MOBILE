@@ -10,9 +10,12 @@ import { appDisplayName } from '@desktop/wallet/appIdentity'
 import { nativeBringToFront } from './deviceAuthNative'
 
 const SYNC_CHANNEL = 'handcash-sync'
-const RECEIVE_CHANNEL = 'handcash-receive'
-const PERMISSION_CHANNEL = 'handcash-permission'
-const UPDATE_CHANNEL = 'handcash-update'
+// Android channels are immutable after first creation. Version the IDs when
+// changing sound / importance so an old silent or disabled channel cannot
+// keep overriding the app's corrected defaults.
+const RECEIVE_CHANNEL = 'handcash-receive-v2'
+const PERMISSION_CHANNEL = 'handcash-permission-v2'
+const UPDATE_CHANNEL = 'handcash-update-v2'
 const FOREGROUND_NOTIFICATION_ID = 15301
 const PERMISSION_NOTIFICATION_ID = 15302
 const UPDATE_NOTIFICATION_ID = 15303
@@ -20,9 +23,16 @@ const UPDATE_NOTIFICATION_ID = 15303
 let appActive = true
 let foregroundRunning = false
 let notificationsReady = false
+let notificationsSetup: Promise<boolean> | null = null
 let lastNotifiedUpdateVersion: string | null = null
+let nextNotificationId = Math.floor(Date.now() % 1_900_000_000)
 
-async function ensureNotifications(): Promise<boolean> {
+function allocateNotificationId(): number {
+  nextNotificationId = (nextNotificationId + 1) % 1_900_000_000
+  return Math.max(1, nextNotificationId)
+}
+
+async function setupNotifications(): Promise<boolean> {
   if (notificationsReady) return true
   try {
     const current = await LocalNotifications.checkPermissions()
@@ -41,6 +51,7 @@ async function ensureNotifications(): Promise<boolean> {
       importance: 4,
       visibility: 1,
       vibration: true,
+      sound: 'default',
     })
     await LocalNotifications.createChannel({
       id: PERMISSION_CHANNEL,
@@ -58,6 +69,7 @@ async function ensureNotifications(): Promise<boolean> {
       importance: 4,
       visibility: 1,
       vibration: true,
+      sound: 'default',
     })
     notificationsReady = true
     return true
@@ -68,6 +80,27 @@ async function ensureNotifications(): Promise<boolean> {
     )
     return false
   }
+}
+
+async function ensureNotifications(): Promise<boolean> {
+  if (notificationsReady) return true
+  if (!notificationsSetup) {
+    notificationsSetup = setupNotifications().finally(() => {
+      notificationsSetup = null
+    })
+  }
+  return notificationsSetup
+}
+
+function runNotification(label: string, task: () => Promise<void>): void {
+  void task().catch((err) => {
+    appendAppLog(
+      'warn',
+      `[mobile-notifications] ${label} failed: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    )
+  })
 }
 
 async function startForegroundSync(): Promise<void> {
@@ -126,10 +159,9 @@ async function scheduleLocal(opts: {
   title: string
   body: string
   channelId: string
-  delayMs?: number
   extra?: Record<string, unknown>
 }): Promise<void> {
-  await LocalNotifications.schedule({
+  const result = await LocalNotifications.schedule({
     notifications: [
       {
         id: opts.id,
@@ -137,20 +169,28 @@ async function scheduleLocal(opts: {
         body: opts.body,
         channelId: opts.channelId,
         smallIcon: 'ic_stat_handcash',
-        schedule: { at: new Date(Date.now() + (opts.delayMs ?? 100)), allowWhileIdle: true },
+        autoCancel: true,
+        ongoing: false,
         ...(opts.extra ? { extra: opts.extra } : {}),
       },
     ],
   })
+  appendAppLog(
+    'info',
+    `[mobile-notifications] posted channel=${opts.channelId} id=${
+      result.notifications[0]?.id ?? opts.id
+    }`,
+  )
 }
 
 async function notifyReceive(detail: { title?: string; body?: string }): Promise<void> {
   if (appActive || !(await ensureNotifications())) return
   await scheduleLocal({
-    id: Math.floor(Date.now() % 2_000_000_000),
+    id: allocateNotificationId(),
     title: detail.title?.trim() || 'Wallet updated',
     body: detail.body?.trim() || 'New wallet activity is available',
     channelId: RECEIVE_CHANNEL,
+    extra: { kind: 'receive' },
   })
 }
 
@@ -167,7 +207,7 @@ async function notifyUpdateAvailable(detail: {
     title: `HandCash ${version} available`,
     body: 'Tap to download the latest beta APK',
     channelId: UPDATE_CHANNEL,
-    extra: { releaseUrl: detail.releaseUrl ?? null },
+    extra: { kind: 'update', releaseUrl: detail.releaseUrl ?? null },
   })
 }
 
@@ -198,7 +238,7 @@ async function notifyPermissionRequest(detail: {
     title,
     body,
     channelId: PERMISSION_CHANNEL,
-    delayMs: 50,
+    extra: { kind: 'permission', origin: origin ?? null },
   })
 }
 
@@ -213,16 +253,27 @@ async function notifyWalletConnected(detail: {
     (detail.origin?.trim() ? appDisplayName(detail.origin) : '') ||
     'app'
   await scheduleLocal({
-    id: Math.floor(Date.now() % 2_000_000_000),
+    id: allocateNotificationId(),
     title: `Wallet connected to ${appName}`,
     body: 'You can return to the app',
     channelId: RECEIVE_CHANNEL,
+    extra: { kind: 'connected', origin: detail.origin ?? null },
   })
 }
 
 /** Install Android lifecycle, background sync, and notification plumbing once. */
 export function installBackgroundRuntime(): void {
   if (!Capacitor.isNativePlatform()) return
+
+  // Do not assume the first JS frame is foreground. Android may recreate the
+  // WebView behind another activity without emitting a transition first.
+  void CapacitorApp.getState()
+    .then(({ isActive }) => {
+      appActive = isActive
+    })
+    .catch(() => {
+      // appStateChange remains the source after startup.
+    })
 
   void CapacitorApp.addListener('appStateChange', ({ isActive }) => {
     appActive = isActive
@@ -240,7 +291,7 @@ export function installBackgroundRuntime(): void {
   })
   document.addEventListener('handcash:receive', (event) => {
     const detail = (event as CustomEvent<{ title?: string; body?: string }>).detail ?? {}
-    void notifyReceive(detail)
+    runNotification('receive', () => notifyReceive(detail))
   })
   document.addEventListener('handcash:permission-request', (event) => {
     const detail =
@@ -254,12 +305,12 @@ export function installBackgroundRuntime(): void {
     void nativeBringToFront()
     window.setTimeout(() => void nativeBringToFront(), 280)
     window.setTimeout(() => void nativeBringToFront(), 900)
-    void notifyPermissionRequest(detail)
+    runNotification('permission', () => notifyPermissionRequest(detail))
   })
   document.addEventListener('handcash:wallet-connected', (event) => {
     const detail =
       (event as CustomEvent<{ appName?: string; origin?: string }>).detail ?? {}
-    void notifyWalletConnected(detail)
+    runNotification('connected', () => notifyWalletConnected(detail))
   })
   document.addEventListener('handcash:permission-dismissed', () => {
     void dismissPermissionNotification()
@@ -268,10 +319,22 @@ export function installBackgroundRuntime(): void {
     const detail =
       (event as CustomEvent<{ version?: string; releaseUrl?: string | null }>).detail ?? {}
     if (appActive) return
-    void notifyUpdateAvailable(detail)
+    runNotification('update', () => notifyUpdateAvailable(detail))
   })
 
+  void LocalNotifications.addListener('localNotificationReceived', (notification) => {
+    appendAppLog(
+      'info',
+      `[mobile-notifications] delivered channel=${
+        notification.channelId ?? 'unknown'
+      } id=${notification.id}`,
+    )
+  })
   void LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+    appendAppLog(
+      'info',
+      `[mobile-notifications] opened id=${action.notification.id}`,
+    )
     document.dispatchEvent(new Event('handcash:app-active'))
     const releaseUrl = action.notification.extra?.releaseUrl
     if (typeof releaseUrl === 'string' && releaseUrl.startsWith('http')) {
