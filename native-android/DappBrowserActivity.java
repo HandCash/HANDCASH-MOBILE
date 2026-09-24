@@ -138,6 +138,26 @@ public class DappBrowserActivity extends Activity {
         wallet.setOnClickListener(v -> bringWalletForward());
         bar.addView(wallet);
 
+        Button back = new Button(this);
+        back.setText("Back");
+        back.setAllCaps(false);
+        back.setTextColor(Color.parseColor("#a1a1aa"));
+        back.setBackgroundColor(Color.TRANSPARENT);
+        back.setOnClickListener(v -> {
+            if (webView != null && webView.canGoBack()) webView.goBack();
+        });
+        bar.addView(back);
+
+        Button forward = new Button(this);
+        forward.setText("Forward");
+        forward.setAllCaps(false);
+        forward.setTextColor(Color.parseColor("#a1a1aa"));
+        forward.setBackgroundColor(Color.TRANSPARENT);
+        forward.setOnClickListener(v -> {
+            if (webView != null && webView.canGoForward()) webView.goForward();
+        });
+        bar.addView(forward);
+
         // Anti-phishing: the page cannot style or hide the origin it is served from.
         hostLabel = new TextView(this);
         hostLabel.setTextColor(Color.parseColor("#fafafa"));
