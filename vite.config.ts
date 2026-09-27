@@ -66,6 +66,12 @@ export default defineConfig({
   resolve: {
     alias: [
       ...desktopAeonAliases(),
+      // @aeon-ui/tree is newer than the published engine Mobile pins, so the
+      // rebase above has nothing to move. Alias it straight to Desktop's vendor.
+      {
+        find: '@aeon-ui/tree',
+        replacement: path.join(DESKTOP_AEON, 'packages/tree/src/index.ts'),
+      },
       { find: '@', replacement: DESKTOP_SRC },
       // Named UI core — same tree as @desktop (legacy alias kept for gradual migrate).
       {
