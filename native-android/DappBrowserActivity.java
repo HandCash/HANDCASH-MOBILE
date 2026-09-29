@@ -111,7 +111,20 @@ public class DappBrowserActivity extends Activity {
         root.addView(progress, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(2)));
 
-        webView = new WebView(this);
+        webView = new WebView(this) {
+            @Override
+            protected void onWindowVisibilityChanged(int visibility) {
+                // Covering this activity with the wallet (approval, then staying
+                // there) reports the window GONE, and Chromium freezes the page.
+                // The reference app's next transaction is started by this page,
+                // not by the wallet, so a parked browser has to keep running.
+                if (visibility == View.GONE) {
+                    super.onWindowVisibilityChanged(View.VISIBLE);
+                    return;
+                }
+                super.onWindowVisibilityChanged(visibility);
+            }
+        };
         webView.setBackgroundColor(Color.BLACK);
         configure(webView);
         root.addView(webView, new LinearLayout.LayoutParams(
@@ -461,12 +474,23 @@ public class DappBrowserActivity extends Activity {
     protected void onResume() {
         super.onResume();
         browserInForeground = true;
+        if (webView != null) {
+            webView.onResume();
+            webView.resumeTimers();
+        }
     }
 
     @Override
     protected void onPause() {
         browserInForeground = false;
         super.onPause();
+        // onPause fires when the wallet covers this activity. The page's
+        // in-flight BRC-100 flow has to take its next step while the user
+        // stays on the wallet, so timers are not paused here.
+        if (webView != null) {
+            webView.onResume();
+            webView.resumeTimers();
+        }
     }
 
     @Override
