@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Rollup } from 'vite'
 import react from '@vitejs/plugin-react'
 import { aeonUiOptimizeDeps, aeonUiViteAliases } from 'aeon-ui-engine/vite'
 import fs from 'node:fs'
@@ -38,6 +38,15 @@ function desktopAeonAliases() {
   })
 }
 
+/**
+ * `@bsv/verifast` glue (page and worker) loads `bdk-core.wasm` from its own
+ * chunk directory by that exact name, so that one asset keeps it unhashed.
+ */
+const assetFileNames = (asset: Rollup.PreRenderedAsset): string =>
+  asset.names.includes('bdk-core.wasm')
+    ? 'assets/[name][extname]'
+    : 'assets/[name]-[hash][extname]'
+
 // Desktop sources ship a Desktop semver constant; the Mobile shell must show its own.
 const pkg = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'),
@@ -49,6 +58,7 @@ export default defineConfig({
     // Wallet Toolbox 2.13 splits its worker bundle; IIFE cannot represent
     // Rollup's resulting multi-chunk graph.
     format: 'es',
+    rollupOptions: { output: { assetFileNames } },
   },
   base: './',
   define: {
@@ -100,6 +110,10 @@ export default defineConfig({
         find: /^@bsv\/sdk$/,
         replacement: path.resolve(__dirname, 'node_modules/@bsv/sdk'),
       },
+      {
+        find: /^@bsv\/verifast$/,
+        replacement: path.resolve(__dirname, 'node_modules/@bsv/verifast'),
+      },
       // Same as Desktop — scrypt-ts Provider extends EventEmitter.
       {
         find: /^events$/,
@@ -135,6 +149,7 @@ export default defineConfig({
       'events',
       'scrypt-ts',
     ],
+    exclude: [...(aeonUiOptimizeDeps().exclude ?? []), '@bsv/verifast'],
   },
   server: {
     port: 5174,
@@ -147,5 +162,6 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     target: 'es2022',
+    rollupOptions: { output: { assetFileNames } },
   },
 })
