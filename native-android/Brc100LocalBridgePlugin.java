@@ -310,6 +310,8 @@ public class Brc100LocalBridgePlugin extends Plugin {
             event.put("path", path);
             event.put("headers", headersJson);
             event.put("body", bodyBuilder.toString());
+            // Wall clock, so JS can time the hop into a backgrounded WebView.
+            event.put("receivedAtMs", System.currentTimeMillis());
             notifyListeners("brc100Request", event);
         } catch (Exception e) {
             Log.w(TAG, "handleClient failed", e);

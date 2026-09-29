@@ -6,6 +6,8 @@ type NativeRequest = {
   path: string
   headers: Record<string, string>
   body: string
+  /** Native accept time (epoch ms); absent on builds before the field. */
+  receivedAtMs?: number
 }
 
 type Brc100LocalBridgePlugin = {
