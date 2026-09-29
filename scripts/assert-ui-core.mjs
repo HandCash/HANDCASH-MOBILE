@@ -113,6 +113,24 @@ function assertAeonEngineFromDesktop() {
 
 assertAeonEngineFromDesktop()
 
+/**
+ * `vite build` bundles whatever parses. Desktop's release CI runs `tsc` and
+ * fails; the APK does not, so 0.1.527 reached the phone with a reference to
+ * an out-of-scope variable (`actionArgs is not defined` on every bounce
+ * deposit) while every Desktop installer for the same core was refused.
+ * The core is one tree — hold it to the same check here.
+ */
+function assertUiCoreTypechecks() {
+  console.info('[ui-core] typechecking Desktop UI core (tsc --noEmit)…')
+  try {
+    execSync('npx tsc -p tsconfig.json --noEmit', { cwd: desktopRoot, stdio: 'inherit' })
+  } catch {
+    die('Desktop UI core does not typecheck — fix it there before building the APK.')
+  }
+}
+
+assertUiCoreTypechecks()
+
 const pin = {
   schema: 1,
   product: 'handcash-mobile',
