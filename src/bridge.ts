@@ -242,6 +242,10 @@ export function installMobileBridge(): void {
 
   // Native → JS BRC-100 requests (same path Desktop uses via Electron IPC).
   onNativeBrc100Request((native) => {
+    if (typeof native.receivedAtMs === 'number') {
+      const ms = Date.now() - native.receivedAtMs
+      if (ms >= 250) console.info(`[spend] bridge_deliver done ${ms}ms`)
+    }
     const event: HttpRequestEvent = {
       method: native.method,
       path: native.path,
