@@ -43,6 +43,8 @@ public class Brc100LocalBridgePlugin extends Plugin {
     private ExecutorService acceptPool;
     private ExecutorService workerPool;
     private volatile boolean running = false;
+    /** BRC-219: a request waiting on the user is never timed out. */
+    private volatile boolean promptOpen = false;
     private final AtomicInteger requestIds = new AtomicInteger(1);
     private final Map<Integer, Pending> pending = new ConcurrentHashMap<>();
 
@@ -103,6 +105,12 @@ public class Brc100LocalBridgePlugin extends Plugin {
     @PluginMethod
     public void stop(PluginCall call) {
         stopServer();
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void setPromptOpen(PluginCall call) {
+        promptOpen = Boolean.TRUE.equals(call.getBoolean("open", false));
         call.resolve();
     }
 
@@ -276,12 +284,14 @@ public class Brc100LocalBridgePlugin extends Plugin {
 
             final int timeoutId = requestId;
             workerPool.execute(() -> {
-                try {
-                    Thread.sleep(REQUEST_TIMEOUT_MS);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
+                do {
+                    try {
+                        Thread.sleep(REQUEST_TIMEOUT_MS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                } while (promptOpen && pending.containsKey(timeoutId));
                 Pending timedOut = pending.remove(timeoutId);
                 if (timedOut == null) return;
                 try {

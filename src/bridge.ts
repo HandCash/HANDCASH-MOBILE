@@ -4,6 +4,7 @@
  */
 
 import {
+  noteNativeBrc100PromptOpen,
   onNativeBrc100Request,
   respondNativeBrc100,
   startNativeBrc100Bridge,
@@ -141,6 +142,9 @@ export function installMobileBridge(): void {
         body: response.body,
       })
     },
+    notePromptOpen: (open: boolean) => {
+      void noteNativeBrc100PromptOpen(open)
+    },
     focusWindow: async () => {
       await nativeBringToFront()
     },
@@ -201,10 +205,13 @@ export function installMobileBridge(): void {
         'handcash.logs.uploadUrl',
         'handcash.update.mode',
       ])
+      const surviveDerivations = 'handcash.brc100.derivedChangeEcho.v1'
       const keys: string[] = []
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i)
-        if (k?.startsWith('handcash.') && !survive.has(k)) keys.push(k)
+        if (!k?.startsWith('handcash.') || survive.has(k)) continue
+        if (k.startsWith(surviveDerivations)) continue
+        keys.push(k)
       }
       for (const k of keys) localStorage.removeItem(k)
       return { removed: keys.length }
