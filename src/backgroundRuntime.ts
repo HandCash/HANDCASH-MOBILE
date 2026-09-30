@@ -21,6 +21,7 @@ const PERMISSION_NOTIFICATION_ID = 15302
 const UPDATE_NOTIFICATION_ID = 15303
 
 let appActive = true
+let walletUnlocked = false
 let foregroundRunning = false
 let notificationsReady = false
 let notificationsSetup: Promise<boolean> | null = null
@@ -103,8 +104,9 @@ function runNotification(label: string, task: () => Promise<void>): void {
   })
 }
 
-async function startForegroundSync(): Promise<void> {
-  if (foregroundRunning || !Capacitor.isNativePlatform()) return
+async function startForegroundSync(opts: { reassert?: boolean } = {}): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return
+  if (foregroundRunning && !opts.reassert) return
   try {
     const permission = await ForegroundService.requestPermissions()
     if (permission.display !== 'granted') {
@@ -125,8 +127,8 @@ async function startForegroundSync(): Promise<void> {
       silent: true,
       notificationChannelId: SYNC_CHANNEL,
     })
+    if (!foregroundRunning) appendAppLog('info', '[mobile-sync] foreground service started')
     foregroundRunning = true
-    appendAppLog('info', '[mobile-sync] foreground service started')
   } catch (err) {
     appendAppLog(
       'warn',
@@ -193,11 +195,41 @@ function walletOnScreen(): boolean {
   return appActive && document.visibilityState === 'visible'
 }
 
+/**
+ * Activity that completes while the user is switching back to the calling app
+ * (spend confirmed, then straight back to Chrome) was never seen on screen.
+ */
+const LEAVING_GRACE_MS = 2_500
+const screenWatchers = new Set<() => void>()
+
+function notifyScreenWatchers(): void {
+  for (const watch of [...screenWatchers]) watch()
+}
+
+function leavesScreenWithin(ms: number): Promise<boolean> {
+  if (!walletOnScreen()) return Promise.resolve(true)
+  return new Promise((resolve) => {
+    const settle = (left: boolean) => {
+      window.clearTimeout(timer)
+      screenWatchers.delete(check)
+      resolve(left)
+    }
+    const check = () => {
+      if (!walletOnScreen()) settle(true)
+    }
+    const timer = window.setTimeout(() => settle(false), ms)
+    screenWatchers.add(check)
+  })
+}
+
 /** Post-worthy wallet activity: false (logged) when on screen or not permitted. */
 async function mayNotifyActivity(kind: string): Promise<boolean> {
   if (walletOnScreen()) {
-    appendAppLog('info', `[mobile-notifications] skipped kind=${kind} reason=onScreen`)
-    return false
+    if (!(await leavesScreenWithin(LEAVING_GRACE_MS))) {
+      appendAppLog('info', `[mobile-notifications] skipped kind=${kind} reason=onScreen`)
+      return false
+    }
+    appendAppLog('info', `[mobile-notifications] kind=${kind} wallet left screen within grace`)
   }
   if (!(await ensureNotifications())) {
     appendAppLog('warn', `[mobile-notifications] skipped kind=${kind} reason=notPermitted`)
@@ -320,16 +352,23 @@ export function installBackgroundRuntime(): void {
 
   void CapacitorApp.addListener('appStateChange', ({ isActive }) => {
     appActive = isActive
+    notifyScreenWatchers()
     if (isActive) {
       document.dispatchEvent(new Event('handcash:app-active'))
+      // Android may reclaim the service (OEM killers, service-type caps)
+      // without telling JS; re-assert it while an app start is still allowed.
+      if (walletUnlocked) void startForegroundSync({ reassert: true })
     }
   })
+  document.addEventListener('visibilitychange', notifyScreenWatchers)
 
   document.addEventListener('handcash:wallet-unlocked', () => {
+    walletUnlocked = true
     void ensureNotifications()
     void startForegroundSync()
   })
   document.addEventListener('handcash:wallet-locked', () => {
+    walletUnlocked = false
     void stopForegroundSync()
   })
   document.addEventListener('handcash:receive', (event) => {

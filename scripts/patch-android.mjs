@@ -14,6 +14,8 @@ const gradlePath = path.join(androidRoot, 'app/build.gradle')
 const nativeRoot = path.join(mobileRoot, 'native-android')
 const keystorePath = path.join(nativeRoot, 'handcash-lab.keystore')
 const rulesPath = path.join(androidRoot, 'app/src/main/res/xml/data_extraction_rules.xml')
+const FGS_SUBTYPE =
+  'Self-custody wallet: answers local BRC-100 wallet requests from other apps on 127.0.0.1 while unlocked'
 
 function die(msg) {
   console.error(`[patch-android] ${msg}`)
@@ -44,12 +46,25 @@ function patchManifest(src) {
       `$1\n    <uses-permission android:name="android.permission.USE_BIOMETRIC" />\n    <uses-permission android:name="android.permission.USE_FINGERPRINT" />`,
     )
   }
-  if (!m.includes('FOREGROUND_SERVICE_DATA_SYNC')) {
+  if (!m.includes('android.permission.FOREGROUND_SERVICE"')) {
     m = m.replace(
       /(<uses-permission android:name="android.permission.USE_FINGERPRINT" \/>)/,
-      `$1\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />`,
+      `$1\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />`,
     )
   }
+  // Android 15 caps dataSync services at 6h per day and the plugin has no
+  // onTimeout, so the capped service is killed and takes the background
+  // wallet bridge with it. specialUse carries no runtime cap.
+  m = m.replace(
+    'android.permission.FOREGROUND_SERVICE_DATA_SYNC',
+    'android.permission.FOREGROUND_SERVICE_SPECIAL_USE',
+  )
+  m = m.replace(
+    /(android:name="io\.capawesome\.capacitorjs\.plugins\.foregroundservice\.AndroidForegroundService"[^>]*?)android:foregroundServiceType="dataSync"\s*\/>/,
+    `$1android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="${FGS_SUBTYPE}" />
+        </service>`,
+  )
   if (!m.includes('USE_FULL_SCREEN_INTENT')) {
     m = m.replace(
       /(<uses-permission android:name="android.permission.POST_NOTIFICATIONS" \/>)/,
@@ -94,7 +109,9 @@ $1<provider`,
     m = m.replace(
       /<\/application>/,
       `        <receiver android:name="io.capawesome.capacitorjs.plugins.foregroundservice.NotificationActionBroadcastReceiver" android:exported="false" />
-        <service android:name="io.capawesome.capacitorjs.plugins.foregroundservice.AndroidForegroundService" android:exported="false" android:foregroundServiceType="dataSync" />
+        <service android:name="io.capawesome.capacitorjs.plugins.foregroundservice.AndroidForegroundService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="${FGS_SUBTYPE}" />
+        </service>
     </application>`,
     )
   }

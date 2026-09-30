@@ -32,6 +32,15 @@ describe('mobile notification runtime', () => {
     assert.match(runtime, /kind: 'spend'/)
   })
 
+  it('posts activity that lands while the wallet is leaving the screen', () => {
+    assert.match(runtime, /leavesScreenWithin\(LEAVING_GRACE_MS\)/)
+    assert.match(runtime, /addEventListener\('visibilitychange', notifyScreenWatchers\)/)
+  })
+
+  it('re-asserts the foreground service when the unlocked wallet returns', () => {
+    assert.match(runtime, /startForegroundSync\(\{ reassert: true \}\)/)
+  })
+
   it('initializes lifecycle state before suppressing foreground notices', () => {
     assert.match(runtime, /CapacitorApp\.getState\(\)/)
     assert.match(runtime, /appActive = isActive/)
