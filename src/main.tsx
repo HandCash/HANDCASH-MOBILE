@@ -8,6 +8,7 @@ import '@handcash/wallet-ui/wallet/browserPolyfills'
 import './mobile-overrides.css'
 import { installMobileBridge } from './bridge'
 import { installBackgroundRuntime } from './backgroundRuntime'
+import { drainNativeCrashReport } from './crashReportNative'
 import { App } from '@handcash/wallet-ui/App'
 import { startHandCashTheme } from '@handcash/wallet-ui/wallet/handcashTheme'
 import { installKeyboardInset } from '@handcash/wallet-ui/wallet/keyboardInset'
@@ -17,6 +18,7 @@ import { startMobileChromeTheme } from './mobileChromeTheme'
 
 installMobileBridge()
 installBackgroundRuntime()
+void drainNativeCrashReport()
 
 // Same appearance stack as Desktop — system / light / dark from Settings.
 startHandCashTheme()
