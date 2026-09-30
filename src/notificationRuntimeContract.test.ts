@@ -37,8 +37,9 @@ describe('mobile notification runtime', () => {
     assert.match(runtime, /addEventListener\('visibilitychange', notifyScreenWatchers\)/)
   })
 
-  it('re-asserts the foreground service when the unlocked wallet returns', () => {
-    assert.match(runtime, /startForegroundSync\(\{ reassert: true \}\)/)
+  it('starts the foreground service once per unlock, never on resume', () => {
+    assert.doesNotMatch(runtime, /reassert/)
+    assert.match(runtime, /if \(foregroundRunning\) return/)
   })
 
   it('initializes lifecycle state before suppressing foreground notices', () => {

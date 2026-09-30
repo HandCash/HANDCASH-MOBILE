@@ -2,15 +2,19 @@ package io.handcash.mobile;
 
 import android.os.Build;
 import android.os.Bundle;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.WebViewListener;
 
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        CrashReportPlugin.install(this);
         registerPlugin(Brc100LocalBridgePlugin.class);
+        registerPlugin(CrashReportPlugin.class);
         registerPlugin(DappBrowserPlugin.class);
         registerPlugin(DeviceAuthPlugin.class);
         registerPlugin(DirectSessionPlugin.class);
@@ -18,6 +22,14 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ShareTextPlugin.class);
         registerPlugin(SystemBrowserPlugin.class);
         super.onCreate(savedInstanceState);
+        if (getBridge() != null) {
+            getBridge().addWebViewListener(new WebViewListener() {
+                @Override
+                public boolean onRenderProcessGone(WebView webView, RenderProcessGoneDetail detail) {
+                    return RendererRecovery.onGone(MainActivity.this, webView, detail, "wallet");
+                }
+            });
+        }
         keepRendererAwake();
     }
 

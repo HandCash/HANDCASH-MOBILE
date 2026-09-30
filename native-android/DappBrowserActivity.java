@@ -17,6 +17,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -84,6 +85,7 @@ public class DappBrowserActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        CrashReportPlugin.install(this);
         // Match Desktop's narrow, vertical app surface. Dapps commonly switch
         // to a materially different layout when Android rotates this Activity.
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
@@ -253,6 +255,12 @@ public class DappBrowserActivity extends Activity {
             @Override
             public void doUpdateVisitedHistory(WebView v, String url, boolean isReload) {
                 setHostLabel(url);
+            }
+
+            @Override
+            public boolean onRenderProcessGone(WebView v, RenderProcessGoneDetail detail) {
+                if (v == webView) webView = null;
+                return RendererRecovery.onGone(DappBrowserActivity.this, v, detail, "browser");
             }
         });
     }

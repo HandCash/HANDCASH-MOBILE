@@ -104,9 +104,12 @@ function runNotification(label: string, task: () => Promise<void>): void {
   })
 }
 
-async function startForegroundSync(opts: { reassert?: boolean } = {}): Promise<void> {
+// Once per unlock. The in-app browser raises MainActivity for every wallet
+// call, and each extra startForegroundService arms Android's startForeground
+// deadline, which kills the whole process when missed.
+async function startForegroundSync(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return
-  if (foregroundRunning && !opts.reassert) return
+  if (foregroundRunning) return
   try {
     const permission = await ForegroundService.requestPermissions()
     if (permission.display !== 'granted') {
@@ -355,9 +358,6 @@ export function installBackgroundRuntime(): void {
     notifyScreenWatchers()
     if (isActive) {
       document.dispatchEvent(new Event('handcash:app-active'))
-      // Android may reclaim the service (OEM killers, service-type caps)
-      // without telling JS; re-assert it while an app start is still allowed.
-      if (walletUnlocked) void startForegroundSync({ reassert: true })
     }
   })
   document.addEventListener('visibilitychange', notifyScreenWatchers)
