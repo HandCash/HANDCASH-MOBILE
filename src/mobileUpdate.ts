@@ -57,7 +57,7 @@ let status: UpdateStatus = {
   canInstall: false,
 }
 let pendingRelease: PendingRelease | null = null
-let checkTimer: ReturnType<typeof setInterval> | null = null
+let checkTimer: number | null = null
 let checkInFlight: Promise<UpdateStatus> | null = null
 let started = false
 

@@ -8,22 +8,25 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -42,15 +45,21 @@ public class Brc100LocalBridgePlugin extends Plugin {
     private final List<ServerSocket> serverSockets = new ArrayList<>();
     private ExecutorService acceptPool;
     private ExecutorService workerPool;
+    private ExecutorService responsePool;
+    private ScheduledExecutorService deadlines;
+    private final java.util.Set<Socket> clients = ConcurrentHashMap.newKeySet();
+    private final Semaphore connections = new Semaphore(64);
     private volatile boolean running = false;
     /** BRC-219: a request waiting on the user is never timed out. */
-    private volatile boolean promptOpen = false;
+    private volatile Integer promptRequestId = null;
+    private volatile boolean unboundPromptOpen = false;
     private final AtomicInteger requestIds = new AtomicInteger(1);
     private final Map<Integer, Pending> pending = new ConcurrentHashMap<>();
 
     private static final class Pending {
         final Socket socket;
         final String httpVersion;
+        volatile ScheduledFuture<?> deadline;
 
         Pending(Socket socket, String httpVersion) {
             this.socket = socket;
@@ -68,8 +77,10 @@ public class Brc100LocalBridgePlugin extends Plugin {
             return;
         }
         try {
-            acceptPool = Executors.newCachedThreadPool();
-            workerPool = Executors.newCachedThreadPool();
+            acceptPool = Executors.newFixedThreadPool(2);
+            workerPool = new ThreadPoolExecutor(8, 8, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(32));
+            responsePool = new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(64));
+            deadlines = Executors.newSingleThreadScheduledExecutor();
             // Bind both families — SDK uses localhost (often ::1); migrate uses 127.0.0.1.
             bindLoopback("127.0.0.1");
             try {
@@ -110,7 +121,9 @@ public class Brc100LocalBridgePlugin extends Plugin {
 
     @PluginMethod
     public void setPromptOpen(PluginCall call) {
-        promptOpen = Boolean.TRUE.equals(call.getBoolean("open", false));
+        boolean open = Boolean.TRUE.equals(call.getBoolean("open", false));
+        promptRequestId = open ? call.getInt("requestId") : null;
+        unboundPromptOpen = open && promptRequestId == null;
         call.resolve();
     }
 
@@ -128,18 +141,16 @@ public class Brc100LocalBridgePlugin extends Plugin {
             call.resolve();
             return;
         }
-        workerPool.execute(() -> {
+        if (p.deadline != null) p.deadline.cancel(false);
+        try { responsePool.execute(() -> {
             try {
                 writeResponse(p.socket, p.httpVersion, status, body);
             } catch (IOException e) {
                 Log.w(TAG, "respond failed", e);
             } finally {
-                try {
-                    p.socket.close();
-                } catch (IOException ignored) {
-                }
+                close(p.socket);
             }
-        });
+        }); } catch (RejectedExecutionException stopped) { close(p.socket); }
         call.resolve();
     }
 
@@ -160,13 +171,15 @@ public class Brc100LocalBridgePlugin extends Plugin {
             workerPool.shutdownNow();
             workerPool = null;
         }
+        if (deadlines != null) { deadlines.shutdownNow(); deadlines = null; }
+        if (responsePool != null) { responsePool.shutdownNow(); responsePool = null; }
+        promptRequestId = null;
+        unboundPromptOpen = false;
         for (Pending p : pending.values()) {
-            try {
-                p.socket.close();
-            } catch (IOException ignored) {
-            }
+            close(p.socket);
         }
         pending.clear();
+        for (Socket socket : clients) close(socket);
     }
 
     @Override
@@ -179,7 +192,11 @@ public class Brc100LocalBridgePlugin extends Plugin {
         while (running && serverSocket != null && !serverSocket.isClosed()) {
             try {
                 Socket socket = serverSocket.accept();
-                workerPool.execute(() -> handleClient(socket));
+                socket.setSoTimeout(10_000);
+                if (!connections.tryAcquire()) { socket.close(); continue; }
+                clients.add(socket);
+                try { workerPool.execute(() -> handleClient(socket)); }
+                catch (RejectedExecutionException busy) { close(socket); }
             } catch (IOException e) {
                 if (running) Log.w(TAG, "accept failed", e);
                 break;
@@ -189,52 +206,11 @@ public class Brc100LocalBridgePlugin extends Plugin {
 
     private void handleClient(Socket socket) {
         try {
-            BufferedReader reader =
-                    new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-            String requestLine = reader.readLine();
-            if (requestLine == null || requestLine.isEmpty()) {
-                socket.close();
-                return;
-            }
-            String[] parts = requestLine.split(" ");
-            if (parts.length < 2) {
-                socket.close();
-                return;
-            }
-            String method = parts[0].toUpperCase(Locale.US);
-            String pathQuery = parts[1];
-            String httpVersion = parts.length >= 3 ? parts[2] : "HTTP/1.1";
-            String path = pathQuery.contains("?") ? pathQuery.substring(0, pathQuery.indexOf('?')) : pathQuery;
-
-            Map<String, String> headers = new HashMap<>();
-            String line;
-            int contentLength = 0;
-            while ((line = reader.readLine()) != null && !line.isEmpty()) {
-                int idx = line.indexOf(':');
-                if (idx > 0) {
-                    String key = line.substring(0, idx).trim().toLowerCase(Locale.US);
-                    String value = line.substring(idx + 1).trim();
-                    headers.put(key, value);
-                    if ("content-length".equals(key)) {
-                        try {
-                            contentLength = Integer.parseInt(value);
-                        } catch (NumberFormatException ignored) {
-                        }
-                    }
-                }
-            }
-
-            StringBuilder bodyBuilder = new StringBuilder();
-            if (contentLength > 0) {
-                char[] buf = new char[contentLength];
-                int read = 0;
-                while (read < contentLength) {
-                    int n = reader.read(buf, read, contentLength - read);
-                    if (n < 0) break;
-                    read += n;
-                }
-                bodyBuilder.append(buf, 0, read);
-            }
+            BoundedHttpRequest request = BoundedHttpRequest.read(socket.getInputStream());
+            String method = request.method;
+            String path = request.path;
+            String httpVersion = request.httpVersion;
+            Map<String, String> headers = request.headers;
 
             // Permission UX is driven from JS (permissions.ts → focusWindow +
             // handcash:permission-request). Do not foreground or notify on every
@@ -242,7 +218,7 @@ public class Brc100LocalBridgePlugin extends Plugin {
 
             if ("OPTIONS".equals(method)) {
                 writeResponse(socket, httpVersion, 204, "");
-                socket.close();
+                close(socket);
                 return;
             }
 
@@ -252,7 +228,7 @@ public class Brc100LocalBridgePlugin extends Plugin {
                         httpVersion,
                         200,
                         "{\"ok\":true,\"service\":\"handcash-brc100\",\"bridge\":\"http\",\"platform\":\"android\"}");
-                socket.close();
+                close(socket);
                 return;
             }
 
@@ -267,7 +243,7 @@ public class Brc100LocalBridgePlugin extends Plugin {
                                 + "\"babbage\":{\"trust\":{\"name\":\"HandCash\",\"note\":\"Official HandCash Mobile — keys stay on your device\"}}"
                                 + "}";
                 writeResponse(socket, httpVersion, 200, manifest);
-                socket.close();
+                close(socket);
                 return;
             }
 
@@ -275,39 +251,15 @@ public class Brc100LocalBridgePlugin extends Plugin {
             // does not depend on the WebView JS thread being ready.
             if ("POST".equals(method) && ("/getVersion".equals(path) || "getVersion".equals(path))) {
                 writeResponse(socket, httpVersion, 200, DISCOVERY_VERSION_JSON);
-                socket.close();
+                close(socket);
                 return;
             }
 
             int requestId = requestIds.getAndIncrement();
             pending.put(requestId, new Pending(socket, httpVersion));
 
-            final int timeoutId = requestId;
-            workerPool.execute(() -> {
-                do {
-                    try {
-                        Thread.sleep(REQUEST_TIMEOUT_MS);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        return;
-                    }
-                } while (promptOpen && pending.containsKey(timeoutId));
-                Pending timedOut = pending.remove(timeoutId);
-                if (timedOut == null) return;
-                try {
-                    writeResponse(
-                            timedOut.socket,
-                            timedOut.httpVersion,
-                            504,
-                            "{\"status\":\"error\",\"code\":\"WALLET_BRIDGE_TIMEOUT\",\"description\":\"No renderer reply\"}");
-                } catch (IOException ignored) {
-                } finally {
-                    try {
-                        timedOut.socket.close();
-                    } catch (IOException ignored) {
-                    }
-                }
-            });
+            Pending waiting = pending.get(requestId);
+            waiting.deadline = deadlines.schedule(() -> expire(requestId), REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 
             JSObject headersJson = new JSObject();
             for (Map.Entry<String, String> e : headers.entrySet()) {
@@ -319,17 +271,43 @@ public class Brc100LocalBridgePlugin extends Plugin {
             event.put("method", method);
             event.put("path", path);
             event.put("headers", headersJson);
-            event.put("body", bodyBuilder.toString());
+            event.put("body", request.body);
             // Wall clock, so JS can time the hop into a backgrounded WebView.
             event.put("receivedAtMs", System.currentTimeMillis());
             notifyListeners("brc100Request", event);
         } catch (Exception e) {
+            try { writeResponse(socket, "HTTP/1.1", e instanceof BoundedHttpRequest.Invalid ? ((BoundedHttpRequest.Invalid) e).status : 400,
+                    "{\"status\":\"error\",\"code\":\"INVALID_HTTP_REQUEST\"}"); }
+            catch (IOException ignored) { }
             Log.w(TAG, "handleClient failed", e);
-            try {
-                socket.close();
-            } catch (IOException ignored) {
-            }
+            close(socket);
         }
+    }
+
+    private void close(Socket socket) {
+        // All admitted sockets consume exactly one permit; close is idempotent.
+        synchronized (socket) {
+            if (socket.isClosed()) return;
+            try { socket.close(); } catch (IOException ignored) { }
+            clients.remove(socket);
+            connections.release();
+        }
+    }
+
+    private void expire(int id) {
+        Pending waiting = pending.get(id);
+        if (waiting == null) return;
+        if (unboundPromptOpen || Integer.valueOf(id).equals(promptRequestId)) {
+            waiting.deadline = deadlines.schedule(() -> expire(id), 1, TimeUnit.SECONDS);
+            return;
+        }
+        if (!pending.remove(id, waiting)) return;
+        try { responsePool.execute(() -> {
+            try { writeResponse(waiting.socket, waiting.httpVersion, 504,
+                "{\"status\":\"error\",\"code\":\"WALLET_BRIDGE_TIMEOUT\",\"description\":\"No renderer reply\"}"); }
+            catch (IOException ignored) { }
+            finally { close(waiting.socket); }
+        }); } catch (RejectedExecutionException stopped) { close(waiting.socket); }
     }
 
     private void writeResponse(Socket socket, String httpVersion, int status, String body)

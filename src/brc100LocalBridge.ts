@@ -14,7 +14,7 @@ type Brc100LocalBridgePlugin = {
   start(): Promise<{ httpUrl: string; alreadyRunning?: boolean }>
   stop(): Promise<void>
   respond(options: { requestId: number; status: number; body: string }): Promise<void>
-  setPromptOpen?(options: { open: boolean }): Promise<void>
+  setPromptOpen?(options: { open: boolean; requestId?: number }): Promise<void>
   addListener(
     eventName: 'brc100Request',
     listenerFunc: (event: NativeRequest) => void,
@@ -68,9 +68,9 @@ export async function respondNativeBrc100(options: {
 }
 
 /** BRC-219: the native bridge holds its deadline while a permission prompt is open. */
-export async function noteNativeBrc100PromptOpen(open: boolean): Promise<void> {
+export async function noteNativeBrc100PromptOpen(open: boolean, requestId?: number): Promise<void> {
   try {
-    await Native.setPromptOpen?.({ open })
+    await Native.setPromptOpen?.({ open, requestId })
   } catch {
     // Older native builds have no hold; their flat deadline stays.
   }

@@ -30,12 +30,16 @@ jobs:
           path: HANDCASH-MOBILE
           ref: ${{ inputs.tag || github.sha }}
 
+      - name: Read pinned Desktop source
+        id: core
+        run: echo "sha=$(node -p "require('./HANDCASH-MOBILE/ui-core-source.json').gitSha")" >> "$GITHUB_OUTPUT"
+
       - name: Checkout Desktop UI core sibling
         uses: actions/checkout@v4
         with:
           repository: HandCash/HANDCASH-DESKTOP
           path: HANDCASH-DESKTOP
-          ref: master
+          ref: ${{ steps.core.outputs.sha }}
           fetch-depth: 0
 
       - name: Setup Node
@@ -68,9 +72,22 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Building HandCash Mobile ${VERSION} → release ${TAG}"
 
+      - name: Restore stable release signer
+        env:
+          KEYSTORE_BASE64: ${{ secrets.HANDCASH_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64" || { echo "Stable signing keystore secret is required" >&2; exit 1; }
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/handcash-release.keystore"
+          chmod 600 "$RUNNER_TEMP/handcash-release.keystore"
+
       - name: Build APK
         working-directory: HANDCASH-MOBILE
         env:
+          HANDCASH_ANDROID_KEYSTORE: ${{ runner.temp }}/handcash-release.keystore
+          HANDCASH_ANDROID_STORE_PASSWORD: ${{ secrets.HANDCASH_ANDROID_STORE_PASSWORD }}
+          HANDCASH_ANDROID_KEY_ALIAS: ${{ secrets.HANDCASH_ANDROID_KEY_ALIAS }}
+          HANDCASH_ANDROID_KEY_PASSWORD: ${{ secrets.HANDCASH_ANDROID_KEY_PASSWORD }}
+          HANDCASH_ANDROID_CERT_SHA256: ${{ secrets.HANDCASH_ANDROID_CERT_SHA256 }}
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

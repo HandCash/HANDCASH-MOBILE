@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
@@ -16,22 +20,63 @@
     "noFallthroughCasesInSwitch": true,
     "resolveJsonModule": true,
     "paths": {
-      "@/*": ["../HANDCASH-DESKTOP/src/*"],
-      "@desktop/*": ["../HANDCASH-DESKTOP/src/*"],
-      "@handcash/wallet-ui": ["../HANDCASH-DESKTOP/src/App.tsx"],
-      "@handcash/wallet-ui/*": ["../HANDCASH-DESKTOP/src/*"],
-      "@aeon-ui/core": ["./node_modules/aeon-ui-engine/packages/core/src/index.ts"],
-      "@aeon-ui/primitives": ["./node_modules/aeon-ui-engine/packages/primitives/src/index.ts"],
-      "@aeon-ui/react": ["./node_modules/aeon-ui-engine/packages/react/src/index.ts"],
-      "@aeon-ui/ui": ["./node_modules/aeon-ui-engine/packages/ui/src/index.ts"],
-      "@aeon-ui/surface": ["./node_modules/aeon-ui-engine/packages/surface/src/index.ts"],
+      "@/*": [
+        "../HANDCASH-DESKTOP/src/*"
+      ],
+      "@desktop/*": [
+        "../HANDCASH-DESKTOP/src/*"
+      ],
+      "@handcash/wallet-ui": [
+        "../HANDCASH-DESKTOP/src/App.tsx"
+      ],
+      "@handcash/wallet-ui/*": [
+        "../HANDCASH-DESKTOP/src/*"
+      ],
+      "@aeon-ui/core": [
+        "../HANDCASH-DESKTOP/vendor/aeon-ui-engine/packages/core/src/index.ts"
+      ],
+      "@aeon-ui/primitives": [
+        "../HANDCASH-DESKTOP/vendor/aeon-ui-engine/packages/primitives/src/index.ts"
+      ],
+      "@aeon-ui/react": [
+        "../HANDCASH-DESKTOP/vendor/aeon-ui-engine/packages/react/src/index.ts"
+      ],
+      "@aeon-ui/ui": [
+        "../HANDCASH-DESKTOP/vendor/aeon-ui-engine/packages/ui/src/index.ts"
+      ],
+      "@aeon-ui/surface": [
+        "../HANDCASH-DESKTOP/vendor/aeon-ui-engine/packages/surface/src/index.ts"
+      ],
       "@aeon-ui/panda/styled-system/css": [
-        "./node_modules/aeon-ui-engine/packages/panda/styled-system/css/index.d.ts"
+        "../HANDCASH-DESKTOP/vendor/aeon-ui-engine/packages/panda/styled-system/css/index.d.ts"
       ],
       "@aeon-ui/panda/styled-system/recipes": [
-        "./node_modules/aeon-ui-engine/packages/panda/styled-system/recipes/index.d.ts"
+        "../HANDCASH-DESKTOP/vendor/aeon-ui-engine/packages/panda/styled-system/recipes/index.d.ts"
+      ],
+      "@aeon-ui/tree": [
+        "../HANDCASH-DESKTOP/vendor/aeon-ui-engine/packages/tree/src/index.ts"
+      ],
+      "react": [
+        "./node_modules/@types/react/index.d.ts"
+      ],
+      "react/*": [
+        "./node_modules/@types/react/*"
+      ],
+      "react-dom": [
+        "./node_modules/@types/react-dom/index.d.ts"
+      ],
+      "react-dom/*": [
+        "./node_modules/@types/react-dom/*"
       ]
     }
   },
-  "include": ["src", "../HANDCASH-DESKTOP/src"]
+  "include": [
+    "src",
+    "../HANDCASH-DESKTOP/src"
+  ],
+  "exclude": [
+    "../HANDCASH-DESKTOP/src/**/*.test.ts",
+    "../HANDCASH-DESKTOP/src/**/*.test.tsx",
+    "src/**/*.test.ts"
+  ]
 }
