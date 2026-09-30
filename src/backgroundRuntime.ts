@@ -183,8 +183,31 @@ async function scheduleLocal(opts: {
   )
 }
 
+/**
+ * HandCash is on screen only when Android calls it active *and* the WebView is
+ * visible. `appStateChange` can lag or never fire (OEM task switchers, a
+ * permission bring-to-front then back to Chrome), which silently dropped
+ * activity notifications while the user was in another app.
+ */
+function walletOnScreen(): boolean {
+  return appActive && document.visibilityState === 'visible'
+}
+
+/** Post-worthy wallet activity: false (logged) when on screen or not permitted. */
+async function mayNotifyActivity(kind: string): Promise<boolean> {
+  if (walletOnScreen()) {
+    appendAppLog('info', `[mobile-notifications] skipped kind=${kind} reason=onScreen`)
+    return false
+  }
+  if (!(await ensureNotifications())) {
+    appendAppLog('warn', `[mobile-notifications] skipped kind=${kind} reason=notPermitted`)
+    return false
+  }
+  return true
+}
+
 async function notifyReceive(detail: { title?: string; body?: string }): Promise<void> {
-  if (appActive || !(await ensureNotifications())) return
+  if (!(await mayNotifyActivity('receive'))) return
   await scheduleLocal({
     id: allocateNotificationId(),
     title: detail.title?.trim() || 'Wallet updated',
@@ -200,7 +223,7 @@ async function notifySpend(detail: {
   txid?: string
   method?: string
 }): Promise<void> {
-  if (appActive || !(await ensureNotifications())) return
+  if (!(await mayNotifyActivity('spend'))) return
   await scheduleLocal({
     id: allocateNotificationId(),
     title: detail.title?.trim() || 'Payment sent',
@@ -267,7 +290,7 @@ async function notifyWalletConnected(detail: {
   origin?: string
 }): Promise<void> {
   await dismissPermissionNotification()
-  if (appActive || !(await ensureNotifications())) return
+  if (!(await mayNotifyActivity('connected'))) return
   const appName =
     detail.appName?.trim() ||
     (detail.origin?.trim() ? appDisplayName(detail.origin) : '') ||
@@ -350,7 +373,7 @@ export function installBackgroundRuntime(): void {
   document.addEventListener('handcash:update-available', (event) => {
     const detail =
       (event as CustomEvent<{ version?: string; releaseUrl?: string | null }>).detail ?? {}
-    if (appActive) return
+    if (walletOnScreen()) return
     runNotification('update', () => notifyUpdateAvailable(detail))
   })
 
