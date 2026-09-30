@@ -16,7 +16,9 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.CookieManager;
-import android.webkit.JavascriptInterface;
+import androidx.webkit.WebViewCompat;
+import androidx.webkit.WebViewFeature;
+import androidx.webkit.JavaScriptReplyProxy;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -37,7 +39,11 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.Collections;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * In-app browser for BRC-100 web apps.
@@ -46,7 +52,7 @@ import java.util.concurrent.Executors;
  * from the page keep being answered and a permission prompt can pull the wallet
  * to the front (see permissions.ts → focusWindow → DeviceAuth.bringToFront).
  *
- * Mixed content is allowed so an https page can still reach loopback :3321.
+ * HTTPS main-frame messages use an origin-aware WebMessageListener.
  * WalletClient('auto') also probes the React Native WebView substrate
  * ({@code window.ReactNativeWebView.postMessage} with CWI envelopes). Chrome
  * never has that object; this Activity injects it and proxies CWI to the same
@@ -62,6 +68,8 @@ public class DappBrowserActivity extends Activity {
     private static final String BRIDGE = "http://127.0.0.1:3321";
     private static final String INJECT =
             "(function(){"
+                    + "if(!window.HandCashRnWallet)return;"
+                    + "window.HandCashRnWallet.onmessage=function(event){window.postMessage(event.data,window.location.origin);};"
                     + "if(window.ReactNativeWebView&&window.ReactNativeWebView.__handcash)return;"
                     + "window.ReactNativeWebView={"
                     + "__handcash:true,"
@@ -76,12 +84,12 @@ public class DappBrowserActivity extends Activity {
     private WebView webView;
     private TextView hostLabel;
     private ProgressBar progress;
-    private volatile String pageOriginator = "";
+    private volatile long navigationGeneration = 0;
     private volatile boolean browserInForeground = false;
-    private final ExecutorService cwiPool = Executors.newCachedThreadPool();
+    private final ExecutorService cwiPool = new ThreadPoolExecutor(4, 4, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(32));
     private final Handler main = new Handler(Looper.getMainLooper());
 
-    @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
+    @SuppressLint({"SetJavaScriptEnabled", "SetJavaScriptEnabled"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -202,13 +210,31 @@ public class DappBrowserActivity extends Activity {
         settings.setDatabaseEnabled(true);
         settings.setSupportMultipleWindows(false);
         settings.setMediaPlaybackRequiresUserGesture(false);
-        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
-        cookies.setAcceptThirdPartyCookies(view, true);
+        cookies.setAcceptThirdPartyCookies(view, false);
 
-        view.addJavascriptInterface(new RnWalletHost(), "HandCashRnWallet");
+        // The platform supplies the sending frame and origin. Never infer the
+        // caller from a mutable toolbar label or expose JavascriptInterface.
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            WebViewCompat.addWebMessageListener(view, "HandCashRnWallet", Collections.singleton("*"),
+                (sender, message, sourceOrigin, isMainFrame, replyProxy) -> {
+                    if (!isMainFrame || !"https".equalsIgnoreCase(sourceOrigin.getScheme()) ||
+                        !sameOrigin(sourceOrigin.toString(), sender.getUrl())) return;
+                    final long generation = navigationGeneration;
+                    final String originator = sourceOrigin.toString();
+                    final String payload = message.getData();
+                    if (payload == null || payload.length() > 8 * 1024 * 1024) return;
+                    try { cwiPool.execute(() -> handleCwi(payload, originator, generation, replyProxy)); }
+                    catch (RejectedExecutionException busy) {
+                        Log.w(TAG, "CWI capacity reached");
+                    }
+                });
+        } else {
+            Log.w(TAG, "Secure wallet bridge unavailable; update Android System WebView");
+        }
 
         view.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -222,6 +248,7 @@ public class DappBrowserActivity extends Activity {
         view.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView v, String url, android.graphics.Bitmap favicon) {
+                navigationGeneration++;
                 setHostLabel(url);
                 v.evaluateJavascript(INJECT, null);
             }
@@ -233,6 +260,7 @@ public class DappBrowserActivity extends Activity {
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest request) {
+                if (!request.isForMainFrame()) return false;
                 Uri target = request.getUrl();
                 String scheme = target.getScheme() == null ? "" : target.getScheme().toLowerCase();
                 if (scheme.equals("https") || scheme.equals("http")) {
@@ -294,9 +322,6 @@ public class DappBrowserActivity extends Activity {
             boolean secure = "https".equalsIgnoreCase(parsed.getScheme());
             hostLabel.setText(secure ? host : host + " (not secure)");
             hostLabel.setTextColor(Color.parseColor(secure ? "#fafafa" : "#f87171"));
-            if (host != null && parsed.getHost() != null) {
-                pageOriginator = parsed.getHost();
-            }
         } catch (Exception e) {
             hostLabel.setText(url);
         }
@@ -362,33 +387,22 @@ public class DappBrowserActivity extends Activity {
         }
     }
 
-    private void deliverCwi(String payload, boolean resumeBrowser) {
-        WebView view = webView;
-        if (view == null) return;
-        final String js = "window.postMessage(" + JSONObject.quote(payload) + ", '*');";
+    private void deliverCwi(String payload, boolean resumeBrowser, long generation, JavaScriptReplyProxy replyProxy) {
         main.post(() -> {
-            WebView live = webView;
-            if (live != null) live.evaluateJavascript(js, null);
+            if (webView == null || navigationGeneration != generation) return;
+            // Reply proxy belongs to the sending document, including its frame.
+            replyProxy.postMessage(payload);
             if (resumeBrowser && !browserInForeground) bringBrowserForward();
         });
     }
 
-    /**
-     * SDK ReactNativeWebView substrate: CWI envelopes in, JSON-API on :3321 out.
-     * Originator is the page host, never a value the page gets to name.
-     */
-    private class RnWalletHost {
-        @JavascriptInterface
-        public void postMessage(String message) {
-            cwiPool.execute(() -> handleCwi(message));
-        }
-    }
-
-    private void handleCwi(String message) {
+    private void handleCwi(String message, String originator, long generation, JavaScriptReplyProxy replyProxy) {
         String id = "";
         String call = "";
         boolean resumeBrowser = false;
+        HttpURLConnection conn = null;
         try {
+            if (navigationGeneration != generation) return;
             JSONObject envelope = new JSONObject(message);
             if (!"CWI".equals(envelope.optString("type"))) return;
             if (!envelope.optBoolean("isInvocation", false)) return;
@@ -404,10 +418,10 @@ public class DappBrowserActivity extends Activity {
             // the resolved request can return to the same live page.
             resumeBrowser = browserInForeground && !"getVersion".equals(call);
             if (resumeBrowser) main.post(this::bringWalletForward);
-            String originator = pageOriginator;
-            HttpURLConnection conn = (HttpURLConnection) new URL(BRIDGE + "/" + call).openConnection();
+            if (navigationGeneration != generation) return;
+            conn = (HttpURLConnection) new URL(BRIDGE + "/" + call).openConnection();
             conn.setConnectTimeout(4_000);
-            conn.setReadTimeout(120_000);
+            conn.setReadTimeout(0);
             conn.setRequestMethod("POST");
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "application/json");
@@ -425,7 +439,11 @@ public class DappBrowserActivity extends Activity {
             ByteArrayOutputStream buf = new ByteArrayOutputStream();
             byte[] chunk = new byte[4096];
             int n;
-            while ((n = stream.read(chunk)) >= 0) buf.write(chunk, 0, n);
+            while ((n = stream.read(chunk)) >= 0) {
+                if (navigationGeneration != generation) return;
+                if (buf.size() + n > 16 * 1024 * 1024) throw new IllegalStateException("Wallet response too large");
+                buf.write(chunk, 0, n);
+            }
             stream.close();
             conn.disconnect();
             String raw = buf.toString(StandardCharsets.UTF_8.name());
@@ -451,7 +469,7 @@ public class DappBrowserActivity extends Activity {
                     reply.put("result", raw);
                 }
             }
-            deliverCwi(reply.toString(), resumeBrowser);
+            deliverCwi(reply.toString(), resumeBrowser, generation, replyProxy);
         } catch (Exception e) {
             Log.w(TAG, "CWI proxy failed", e);
             if (id.isEmpty()) return;
@@ -463,11 +481,11 @@ public class DappBrowserActivity extends Activity {
                 reply.put("status", "error");
                 reply.put("code", "WALLET_BRIDGE_ERROR");
                 reply.put("description", e.getMessage() == null ? "CWI proxy failed" : e.getMessage());
-                deliverCwi(reply.toString(), resumeBrowser);
+                deliverCwi(reply.toString(), resumeBrowser, generation, replyProxy);
             } catch (Exception ignored) {
                 // drop
             }
-        }
+        } finally { if (conn != null) conn.disconnect(); }
     }
 
     @Override
@@ -512,9 +530,11 @@ public class DappBrowserActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        navigationGeneration++;
         cwiPool.shutdownNow();
         if (webView != null) {
-            webView.removeJavascriptInterface("HandCashRnWallet");
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))
+                WebViewCompat.removeWebMessageListener(webView, "HandCashRnWallet");
             webView.loadUrl("about:blank");
             webView.destroy();
             webView = null;

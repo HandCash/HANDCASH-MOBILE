@@ -69,31 +69,51 @@ if [[ ! -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]]; then
   mv /tmp/android-cmdline-tools/cmdline-tools/* "$ANDROID_HOME/cmdline-tools/latest/"
 fi
 
-yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" \
-  "platform-tools" "platforms;android-35" "build-tools;35.0.0" >/tmp/sdkmanager.log || true
+# Licence answers come from process substitution: under pipefail, `yes |`
+# fails the build with SIGPIPE whenever sdkmanager exits without reading.
+"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" \
+  "platform-tools" "platforms;android-35" "build-tools;35.0.0" >/tmp/sdkmanager.log < <(yes)
 
-npm install
+npm ci
 
 # Fail closed unless sibling Desktop UI core is pinned (version + git SHA).
 node "$ROOT/scripts/assert-ui-core.mjs"
 
 npm run build
-node node_modules/@capacitor/cli/bin/capacitor add android 2>/dev/null || true
+if [[ ! -d android ]]; then
+  node node_modules/@capacitor/cli/bin/capacitor add android
+fi
 node node_modules/@capacitor/cli/bin/capacitor sync android
 
 node "$ROOT/scripts/patch-android.mjs"
 
 (
   cd android
-  ./gradlew assembleDebug
+  if [[ "${HANDCASH_BUILD_TYPE:-release}" == "debug" ]]; then
+    ./gradlew assembleDebug
+  else
+    : "${HANDCASH_ANDROID_KEYSTORE:?Release requires the stable private signing keystore}"
+    : "${HANDCASH_ANDROID_STORE_PASSWORD:?Release requires store password}"
+    : "${HANDCASH_ANDROID_KEY_ALIAS:?Release requires key alias}"
+    : "${HANDCASH_ANDROID_KEY_PASSWORD:?Release requires key password}"
+    : "${HANDCASH_ANDROID_CERT_SHA256:?Release requires the expected signer certificate fingerprint}"
+    ./gradlew assembleRelease
+  fi
 )
 
 MOBILE_VERSION="$(node -p "require('./package.json').version")"
-APK="$ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
+if [[ "${HANDCASH_BUILD_TYPE:-release}" == "debug" ]]; then
+  APK="$ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
+else
+  APK="$ROOT/android/app/build/outputs/apk/release/app-release.apk"
+  signer=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | awk '/Signer #1 certificate SHA-256 digest:/ {print $NF}')
+  expected=$(printf '%s' "$HANDCASH_ANDROID_CERT_SHA256" | tr -d ':' | tr '[:upper:]' '[:lower:]')
+  [[ "$signer" == "$expected" ]] || { echo "Release signer does not match the configured certificate" >&2; exit 1; }
+fi
 mkdir -p "$ROOT/artifacts"
 OUT="$ROOT/artifacts/handcash-mobile-${MOBILE_VERSION}.apk"
 cp "$APK" "$OUT"
-cp "$APK" "$ROOT/artifacts/handcash-mobile-debug.apk"
+if [[ "${HANDCASH_BUILD_TYPE:-release}" == "debug" ]]; then cp "$APK" "$ROOT/artifacts/handcash-mobile-debug.apk"; fi
 if command -v sha256sum >/dev/null 2>&1; then
   SHA="$(sha256sum "$OUT" | awk '{print $1}')"
 else
@@ -104,4 +124,4 @@ node "$ROOT/scripts/assert-ui-core.mjs" --out "artifacts/ui-core-pin.json"
 cp -f "$ROOT/artifacts/ui-core-pin.json" "$ROOT/artifacts/handcash-mobile-${MOBILE_VERSION}.ui-core-pin.json"
 echo "APK ready: $OUT"
 echo "SHA-256: $SHA"
-ls -la "$OUT" "$ROOT/artifacts/handcash-mobile-debug.apk" "$ROOT/artifacts/ui-core-pin.json"
+ls -la "$OUT" "$ROOT/artifacts/ui-core-pin.json"

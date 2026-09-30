@@ -164,6 +164,9 @@ function patchGradle(src, version, versionCode) {
   g = g.replace(/versionName\s+"[^"]+"/, `versionName "${version}"`)
   g = g.replace(/^undefined\s*$/gm, '')
 
+  if (!g.includes('androidx.webkit:webkit')) {
+    g = g.replace(/(implementation "androidx.core:core-splashscreen:[^"]+")/, '$1\n    implementation "androidx.webkit:webkit:1.12.1"')
+  }
   if (!g.includes('androidx.biometric:biometric')) {
     g = g.replace(
       /(implementation "androidx.core:core-splashscreen:[^"]+")/,
@@ -171,28 +174,23 @@ function patchGradle(src, version, versionCode) {
     )
   }
 
-  if (fs.existsSync(keystorePath) && !g.includes('handcash-lab.keystore')) {
-    g = g.replace(
-      /android \{\n/,
-      `android {
+  // Release signing always comes from the stable private CI/local configuration.
+  // The lab certificate remains an explicit debug-only option for installed lab wallets.
+  if (!g.includes('handcashRelease')) {
+    g = g.replace(/android \{\n/, `android {
     signingConfigs {
-        lab {
-            storeFile file("../../native-android/handcash-lab.keystore")
-            storePassword "android"
-            keyAlias "androiddebugkey"
-            keyPassword "android"
+        handcashRelease {
+            def keyPath = System.getenv("HANDCASH_ANDROID_KEYSTORE")
+            if (keyPath) storeFile file(keyPath)
+            storePassword System.getenv("HANDCASH_ANDROID_STORE_PASSWORD")
+            keyAlias System.getenv("HANDCASH_ANDROID_KEY_ALIAS")
+            keyPassword System.getenv("HANDCASH_ANDROID_KEY_PASSWORD")
         }
     }
-`,
-    )
-    g = g.replace(
-      /buildTypes \{\n\s*release \{/,
-      `buildTypes {
-        debug {
-            signingConfig signingConfigs.lab
-        }
-        release {`,
-    )
+`)
+    g = g.replace(/release \{/, `release {
+            signingConfig signingConfigs.handcashRelease
+            debuggable false`)
   }
 
   return g
@@ -230,10 +228,10 @@ function ensureDataExtractionRules() {
 
 function ensureLabKeystore() {
   if (fs.existsSync(keystorePath)) return true
-  const fromEnv = process.env.HANDCASH_ANDROID_KEYSTORE?.trim()
+  const fromEnv = process.env.HANDCASH_ANDROID_LAB_KEYSTORE?.trim()
   if (fromEnv && fs.existsSync(fromEnv)) {
     fs.copyFileSync(fromEnv, keystorePath)
-    console.log(`[patch-android] copied lab keystore from HANDCASH_ANDROID_KEYSTORE`)
+    console.log(`[patch-android] copied lab keystore from HANDCASH_ANDROID_LAB_KEYSTORE`)
     return true
   }
   return false
@@ -250,7 +248,7 @@ if (!hasKeystore) {
     `[patch-android] WARNING: ${keystorePath} missing — debug APK will use this machine's ~/.android/debug.keystore.`,
   )
   console.warn(
-    '[patch-android] Android blocks upgrades when the signing key differs (Mac vs Linux).',
+    '[patch-android] Debug signer is local; releases require HANDCASH_ANDROID_KEYSTORE and the expected certificate fingerprint.',
   )
   console.warn(
     '[patch-android] Fix: on Mac run  bash scripts/export-lab-keystore.sh',

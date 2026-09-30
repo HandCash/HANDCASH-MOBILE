@@ -19,8 +19,8 @@ const desktopCandidates = [
   path.resolve(mobileRoot, '../handcash-brc100'),
 ]
 const desktopRoot = desktopCandidates.find((p) => fs.existsSync(p))
-const uiPkgPath = path.join(desktopRoot, 'packages/wallet-ui/package.json')
-const desktopPkgPath = path.join(desktopRoot, 'package.json')
+const uiPkgPath = path.join(desktopRoot || desktopCandidates[0], 'packages/wallet-ui/package.json')
+const desktopPkgPath = path.join(desktopRoot || desktopCandidates[0], 'package.json')
 const mobilePkgPath = path.join(mobileRoot, 'package.json')
 
 const args = process.argv.slice(2)
@@ -69,6 +69,10 @@ if (uiPkg.version !== desktopPkg.version) {
 const sha = git(desktopRoot, 'git rev-parse HEAD')
 const short = git(desktopRoot, 'git rev-parse --short HEAD')
 const branch = git(desktopRoot, 'git rev-parse --abbrev-ref HEAD')
+const source = JSON.parse(fs.readFileSync(path.join(mobileRoot, 'ui-core-source.json'), 'utf8'))
+if (source.gitSha !== sha || source.version !== uiPkg.version) {
+  die('Desktop source differs from ui-core-source.json; select and commit the intended core before release.')
+}
 const dirty = Boolean(git(desktopRoot, 'git status --porcelain'))
 const allowDirty = process.env.ALLOW_DIRTY_UI_CORE === '1'
 

@@ -2,9 +2,9 @@ import { Capacitor } from '@capacitor/core'
 import {
   HANDCASH_DARK_PALETTE,
   HANDCASH_LIGHT_PALETTE,
-  type ResolvedColorMode,
 } from '@handcash/wallet-ui/wallet/handcashTheme'
 import {
+  type ResolvedColorMode,
   resolveColorMode,
   subscribeAppearance,
 } from '@handcash/wallet-ui/wallet/themePrefs'

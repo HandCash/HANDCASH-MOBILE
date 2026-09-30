@@ -1,3 +1,4 @@
+import { nativeArchiveBrc39 } from './brc39ArchiveNative'
 /**
  * Capacitor stand-in for Electron `window.handcash`.
  * BRC-100 presence: native localhost :3321 (see Brc100LocalBridgePlugin) + JS wiring.
@@ -108,6 +109,7 @@ export function installMobileBridge(): void {
   const platform = detectPlatform()
 
   const handcash = {
+    ...nativeArchiveBrc39,
     platform,
     getAppInfo: async () => ({
       version: VERSION,
@@ -142,8 +144,8 @@ export function installMobileBridge(): void {
         body: response.body,
       })
     },
-    notePromptOpen: (open: boolean) => {
-      void noteNativeBrc100PromptOpen(open)
+    notePromptOpen: (open: boolean, requestId?: number) => {
+      void noteNativeBrc100PromptOpen(open, requestId)
     },
     focusWindow: async () => {
       await nativeBringToFront()
