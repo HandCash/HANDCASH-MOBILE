@@ -106,9 +106,34 @@ if [[ "${HANDCASH_BUILD_TYPE:-release}" == "debug" ]]; then
   APK="$ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
 else
   APK="$ROOT/android/app/build/outputs/apk/release/app-release.apk"
-  signer=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | awk '/Signer #1 certificate SHA-256 digest:/ {print $NF}')
+  APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+  # Key rotation (APK Signature Scheme v3): Android 9+ trusts the release key
+  # through the lineage; older Android and v1/v2 keep the original signer, so
+  # every install updates in place. The release key never enters the repo.
+  LINEAGE="$ROOT/native-android/signing-lineage.bin"
+  NEXT_KS="${HANDCASH_ANDROID_NEXT_KEYSTORE:-$HOME/.handcash/android-signing/handcash-release.p12}"
+  NEXT_ALIAS="${HANDCASH_ANDROID_NEXT_KEY_ALIAS:-handcash-release}"
+  NEXT_SHA="${HANDCASH_ANDROID_NEXT_CERT_SHA256:-4a0dae371b99461cc6db57c63d7105cb9ffde34d3bb6b3f4dbfaa148442d8c4e}"
+  [[ -f "$LINEAGE" ]] || { echo "Missing signing lineage $LINEAGE" >&2; exit 1; }
+  [[ -f "$NEXT_KS" ]] || { echo "Release key $NEXT_KS not found — restore it from backup" >&2; exit 1; }
+  NEXT_PASS="${HANDCASH_ANDROID_NEXT_STORE_PASSWORD:-$(security find-generic-password -s handcash-android-release -a "$NEXT_ALIAS" -w 2>/dev/null || true)}"
+  [[ -n "$NEXT_PASS" ]] || { echo "Release key password not in env or Keychain (handcash-android-release)" >&2; exit 1; }
+  ROTATED="$APK.rotated"
+  "$APKSIGNER" sign \
+    --ks "$HANDCASH_ANDROID_KEYSTORE" --ks-key-alias "$HANDCASH_ANDROID_KEY_ALIAS" \
+    --ks-pass "env:HANDCASH_ANDROID_STORE_PASSWORD" --key-pass "env:HANDCASH_ANDROID_KEY_PASSWORD" \
+    --next-signer --ks "$NEXT_KS" --ks-key-alias "$NEXT_ALIAS" --ks-pass "pass:$NEXT_PASS" \
+    --lineage "$LINEAGE" --rotation-min-sdk-version 28 \
+    --out "$ROTATED" "$APK"
+  mv -f "$ROTATED" "$APK"
+  rm -f "$ROTATED.idsig" "$APK.idsig"
+  signerFor() {
+    "$APKSIGNER" verify --print-certs --min-sdk-version "$1" --max-sdk-version "$2" "$APK" 2>/dev/null \
+      | awk '/Signer #1 certificate SHA-256 digest:/ {print $NF}'
+  }
   expected=$(printf '%s' "$HANDCASH_ANDROID_CERT_SHA256" | tr -d ':' | tr '[:upper:]' '[:lower:]')
-  [[ "$signer" == "$expected" ]] || { echo "Release signer does not match the configured certificate" >&2; exit 1; }
+  [[ "$(signerFor 23 27)" == "$expected" ]] || { echo "Android 6-8 signer is not the original certificate" >&2; exit 1; }
+  [[ "$(signerFor 28 35)" == "$NEXT_SHA" ]] || { echo "Android 9+ signer is not the rotated release certificate" >&2; exit 1; }
 fi
 mkdir -p "$ROOT/artifacts"
 OUT="$ROOT/artifacts/handcash-mobile-${MOBILE_VERSION}.apk"
