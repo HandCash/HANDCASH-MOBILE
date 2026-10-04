@@ -6,6 +6,9 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
     />
+    <!-- The wallet's native file store is a JavaScript interface every frame
+         in this WebView could call. dApps open in DappBrowserActivity. -->
+    <meta http-equiv="Content-Security-Policy" content="frame-src 'none'; object-src 'none'; base-uri 'none'" />
     <meta name="color-scheme" content="light dark" />
     <meta id="hc-theme-color" name="theme-color" content="#fafbfa" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
