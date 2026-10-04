@@ -18,6 +18,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(CrashReportPlugin.class);
         registerPlugin(DappBrowserPlugin.class);
         registerPlugin(DeviceAuthPlugin.class);
+        registerPlugin(DurableStorePlugin.class);
         registerPlugin(DirectSessionPlugin.class);
         registerPlugin(SaveImagePlugin.class);
         registerPlugin(ShareTextPlugin.class);

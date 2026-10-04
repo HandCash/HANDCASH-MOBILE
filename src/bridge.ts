@@ -34,6 +34,14 @@ import { nativeDirectSessionApi } from './directSessionNative'
 import { nativeSaveImageToGallery } from './saveImageNative'
 import { nativeShareText } from './shareTextNative'
 import { formatAppLogs, installAppLogCapture } from '@desktop/wallet/appLog'
+import { shouldWipeHandcashKey } from '@desktop/wallet/wipePolicy'
+import {
+  durableStoreBridge,
+  moveOriginStorageIntoNative,
+  nativeDurableKeys,
+  nativeDurableStore,
+  type OriginMove,
+} from './durableStoreNative'
 
 type BridgeStatus = {
   online: boolean
@@ -107,6 +115,18 @@ export function installMobileBridge(): void {
   if (window.handcash) return
 
   const platform = detectPlatform()
+  const durable = nativeDurableStore()
+  let originMove: OriginMove | null = null
+  let originMoveMs = 0
+  if (durable) {
+    const moveStartedAt = Date.now()
+    try {
+      originMove = moveOriginStorageIntoNative(durable, localStorage)
+      originMoveMs = Date.now() - moveStartedAt
+    } catch (err) {
+      console.warn('[durable] could not move WebView storage into the file store', err)
+    }
+  }
 
   const handcash = {
     ...nativeArchiveBrc39,
@@ -178,13 +198,11 @@ export function installMobileBridge(): void {
       error: 'Use embedded QR link on mobile',
     }),
     stopDeviceLink: async () => ({ ok: true as const }),
-    // No storageGetSync / storageSetSync on purpose. Mobile has no second
-    // origin-independent store, so WebView storage is the durable store and the
-    // shared durableStorage layer must write to it in full. Answering these with
-    // `null` / `true` to avoid a double write instead made the core treat this
-    // shell as the owner of a file store: every write reported success, values
-    // over the small-key mirror cap reached no store at all, and Activity, chat
-    // and inventory reset on relaunch.
+    // Only when the native file store is really there. Answering these without
+    // one made the core treat this shell as the owner of a file store: every
+    // write reported success, values over the small-key mirror cap reached no
+    // store at all, and Activity, chat and inventory reset on relaunch.
+    ...(durable ? durableStoreBridge(durable) : {}),
     safeStorageAvailable: async () => {
       const status = await nativeDeviceAuthStatus()
       return status.available
@@ -198,25 +216,20 @@ export function installMobileBridge(): void {
     },
     wipeWalletStorage: async () => {
       await nativeDeviceAuthClear()
-      // Keep in sync with HANDCASH-DESKTOP/src/wallet/wipePolicy.ts — wipe must
-      // clear fungibles/BRC-29/remittance caches under handcash.*, not only
-      // handcash.brc100.*, or a new wallet paints the previous King token.
-      const survive = new Set([
-        'handcash.appearance',
-        'handcash.sfx.enabled',
-        'handcash.logs.uploadUrl',
-        'handcash.update.mode',
-      ])
-      const surviveDerivations = 'handcash.brc100.derivedChangeEcho.v1'
-      const keys: string[] = []
+      const keys = new Set<string>()
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i)
-        if (!k?.startsWith('handcash.') || survive.has(k)) continue
-        if (k.startsWith(surviveDerivations)) continue
-        keys.push(k)
+        if (k && shouldWipeHandcashKey(k)) keys.add(k)
       }
       for (const k of keys) localStorage.removeItem(k)
-      return { removed: keys.length }
+      if (durable) {
+        for (const k of nativeDurableKeys(durable)) {
+          if (!shouldWipeHandcashKey(k)) continue
+          durable.remove(k)
+          keys.add(k)
+        }
+      }
+      return { removed: keys.size }
     },
     clipboardWrite: async (text: string) => {
       await navigator.clipboard.writeText(text)
@@ -248,6 +261,13 @@ export function installMobileBridge(): void {
   })
 
   installAppLogCapture()
+  if (!durable) {
+    console.warn('[durable] native file store missing — wallet state stays in WebView storage (≈5MB)')
+  } else if (originMove) {
+    console.info(
+      `[durable] origin move done ${originMoveMs}ms — ${originMove.moved} key(s) (${Math.round(originMove.movedBytes / 1024)}KB) into the app file store · freed ${Math.round(originMove.freedBytes / 1024)}KB of WebView storage`,
+    )
+  }
 
   // Native → JS BRC-100 requests (same path Desktop uses via Electron IPC).
   onNativeBrc100Request((native) => {
