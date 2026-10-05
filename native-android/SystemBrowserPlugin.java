@@ -19,8 +19,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  * look like a second in-app browser that Desktop does not have. It also cannot
  * download an APK: a WebView with no DownloadListener drops the response.
  *
- * {@link DappBrowserPlugin} stays the opposite choice — the retained in-app
- * browser that carries the CWI bridge. Only that one may load app pages.
+ * {@link AppBrowserGuestPlugin} stays the opposite choice — tabs inside the
+ * wallet's browser panel. Only that one may load app pages in the app.
  */
 @CapacitorPlugin(name = "SystemBrowser")
 public class SystemBrowserPlugin extends Plugin {

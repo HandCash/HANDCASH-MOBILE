@@ -42,7 +42,7 @@ import java.util.regex.Pattern;
  * `@JavascriptInterface` calls are synchronous by design — the core's storage
  * API is — and are visible to every frame in the wallet WebView, which is why
  * the page forbids frames (`frame-src 'none'`). dApps run in
- * {@link DappBrowserActivity}, a separate WebView without this interface.
+ * {@link AppBrowserGuestPlugin} guests, separate WebViews without this interface.
  */
 @CapacitorPlugin(name = "DurableStore")
 public class DurableStorePlugin extends Plugin {

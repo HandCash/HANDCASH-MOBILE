@@ -18,7 +18,7 @@ import {
   nativeDeviceAuthStatus,
   nativeDeviceAuthUnlock,
 } from './deviceAuthNative'
-import { nativeOpenDappBrowser } from './dappBrowserNative'
+import { nativeAppBrowserGuest, noteAppBrowserPromptOpen } from './appBrowserGuestNative'
 import { nativeOpenSystemBrowser } from './systemBrowserNative'
 import {
   checkMobileUpdates,
@@ -166,6 +166,7 @@ export function installMobileBridge(): void {
     },
     notePromptOpen: (open: boolean, requestId?: number) => {
       void noteNativeBrc100PromptOpen(open, requestId)
+      noteAppBrowserPromptOpen(open)
     },
     focusWindow: async () => {
       await nativeBringToFront()
@@ -178,9 +179,9 @@ export function installMobileBridge(): void {
       if (opened.ok) return
       window.open(url, '_blank', 'noopener,noreferrer')
     },
-    // The wallet's own in-app browser (DappBrowserActivity), not Chrome: it
-    // carries the CWI bridge to :3321. `openExternal` is the system browser.
-    openAppBrowser: (url: string) => nativeOpenDappBrowser(url),
+    // The core's browser panel draws app tabs through a native WebView laid
+    // over it, as Desktop does with `<webview>`. `openExternal` is Chrome.
+    appBrowserGuest: nativeAppBrowserGuest(),
     getLogInfo: async () => ({ file: null, dir: null }),
     openLogs: async () => ({ ok: false as const, error: 'Finder reveal is Desktop-only' }),
     readLogs: async () => {
