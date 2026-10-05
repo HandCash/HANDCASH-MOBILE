@@ -151,12 +151,8 @@ export async function setMobileUpdateMode(mode: UpdateMode): Promise<UpdateStatu
 }
 
 /**
- * The APK goes to the OS download manager, never to the in-app browser.
- *
- * `DappBrowserActivity` is a bare WebView with no DownloadListener, so the
- * download silently produced nothing — and because that Activity persists the
- * last URL it loaded, the release page then became the page the wallet's app
- * browser resumed to.
+ * The APK goes to the OS download manager, never to the in-app browser: an app
+ * tab is for app pages, and the release page must not become one.
  */
 async function openApkDownload(release: PendingRelease): Promise<void> {
   const opened = await nativeOpenSystemBrowser(release.apkUrl)

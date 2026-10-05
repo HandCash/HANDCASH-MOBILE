@@ -71,40 +71,9 @@ function patchManifest(src) {
       `$1\n    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />`,
     )
   }
-  if (!m.includes('DappBrowserActivity')) {
-
-    m = m.replace(
-      /(\s*)<provider/,
-      `$1<activity
-            android:name=".DappBrowserActivity"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:screenOrientation="portrait"
-            android:label="@string/app_name"
-            android:theme="@android:style/Theme.Material.NoActionBar"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
-            android:windowSoftInputMode="adjustResize" />
-$1<provider`,
-    )
-  }
-  if (
-    m.includes('DappBrowserActivity') &&
-    !/android:name="\.DappBrowserActivity"[\s\S]*?android:launchMode="singleTask"/.test(m)
-  ) {
-    m = m.replace(
-      /(android:name="\.DappBrowserActivity"\s+android:exported="false")/,
-      '$1\n            android:launchMode="singleTask"',
-    )
-  }
-  if (
-    m.includes('DappBrowserActivity') &&
-    !/android:name="\.DappBrowserActivity"[\s\S]*?android:screenOrientation="portrait"/.test(m)
-  ) {
-    m = m.replace(
-      /(android:name="\.DappBrowserActivity"[\s\S]*?android:launchMode="singleTask")/,
-      '$1\n            android:screenOrientation="portrait"',
-    )
-  }
+  // The separate in-app browser activity is retired; app tabs are guests in
+  // the wallet activity (AppBrowserGuestPlugin). Drop it from old manifests.
+  m = m.replace(/\s*<activity\s+android:name="\.DappBrowserActivity"[^>]*\/>/g, '')
   if (!m.includes('AndroidForegroundService')) {
     m = m.replace(
       /<\/application>/,
@@ -262,6 +231,12 @@ write(gradlePath, patchGradle(read(gradlePath), version, versionCode))
 ensureDataExtractionRules()
 
 const nativeDst = path.join(androidRoot, 'app/src/main/java/io/handcash/mobile')
+// `android/` persists between builds, so a source deleted here would otherwise
+// keep compiling from the last copy.
+const RETIRED_NATIVE = ['DappBrowserActivity.java', 'DappBrowserPlugin.java']
+for (const name of RETIRED_NATIVE) {
+  fs.rmSync(path.join(nativeDst, name), { force: true })
+}
 if (fs.existsSync(nativeRoot) && fs.existsSync(nativeDst)) {
   for (const name of fs.readdirSync(nativeRoot)) {
     if (!name.endsWith('.java')) continue
