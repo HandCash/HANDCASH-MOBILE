@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import {
   durableStoreBridge,
   moveOriginStorageIntoNative,
+  ORIGIN_RECOVERED_KEY,
   type NativeDurableStore,
   type OriginStorage,
 } from './durableStoreNative.ts'
@@ -66,13 +67,68 @@ test('keeps the origin copy when the file store refuses it', () => {
   assert.equal(local.get('handcash.createdBeef.aa'), big)
 })
 
-test('never overwrites what the file store already holds', () => {
-  const { store, held: native } = memoryNative({ 'handcash.brc100.appActivity': 'newer' })
+test('never overwrites what the file store already holds once recovered', () => {
+  const { store, held: native } = memoryNative({
+    [ORIGIN_RECOVERED_KEY]: '1',
+    'handcash.brc100.appActivity': 'newer',
+    'handcash.wallet.pendingMinerOutbox.v1': 'queued',
+  })
   const { origin, held: local } = memoryOrigin({ 'handcash.brc100.appActivity': big })
 
-  assert.equal(moveOriginStorageIntoNative(store, origin).moved, 0)
+  const result = moveOriginStorageIntoNative(store, origin)
+  assert.equal(result.moved, 0)
+  assert.equal(result.recovered, 0)
   assert.equal(native.get('handcash.brc100.appActivity'), 'newer')
+  assert.equal(native.get('handcash.wallet.pendingMinerOutbox.v1'), 'queued')
   assert.equal(local.has('handcash.brc100.appActivity'), false)
+})
+
+test('first fixed boot: the WebView copy the last session ran on wins, once', () => {
+  const suffix = ':wallet:main:0:root'
+  const { store, held: native } = memoryNative({
+    [`handcash.tokens.list.v1${suffix}`]: 'first-move copy',
+    'handcash.brc100.vault.v1': '{"identityKey":"a","accounts":1}',
+    [`handcash.wallet.pendingMinerOutbox.v1${suffix}`]: 'settled months ago',
+    [`handcash.brc150.remittance.v1${suffix}`]: 'only the file store has this',
+  })
+  const allowed: string[] = []
+  const set = store.set
+  store.set = (key, value, allow) => {
+    if (allow) allowed.push(key)
+    return set(key, value, allow)
+  }
+  const { origin, held: local } = memoryOrigin({
+    [`handcash.tokens.list.v1${suffix}`]: big,
+    'handcash.brc100.vault.v1': '{"identityKey":"a","accounts":4}',
+  })
+
+  const result = moveOriginStorageIntoNative(store, origin)
+
+  assert.equal(result.recovered, 2)
+  assert.equal(result.droppedQueues, 1)
+  assert.equal(native.get(`handcash.tokens.list.v1${suffix}`), big)
+  assert.equal(native.get('handcash.brc100.vault.v1'), '{"identityKey":"a","accounts":4}')
+  // Replacing a held vault may cross the identity guard; the store archives it.
+  assert.deepEqual(allowed.sort(), ['handcash.brc100.vault.v1', `handcash.tokens.list.v1${suffix}`].sort())
+  assert.equal(native.has(`handcash.wallet.pendingMinerOutbox.v1${suffix}`), false)
+  assert.equal(native.get(`handcash.brc150.remittance.v1${suffix}`), 'only the file store has this')
+  assert.equal(local.has(`handcash.tokens.list.v1${suffix}`), false)
+  assert.ok(native.has(ORIGIN_RECOVERED_KEY))
+
+  // The next boot is back to file-store-authoritative.
+  local.set('handcash.brc100.vault.v1', '{"identityKey":"a","accounts":1}')
+  assert.equal(moveOriginStorageIntoNative(store, origin).recovered, 0)
+  assert.equal(native.get('handcash.brc100.vault.v1'), '{"identityKey":"a","accounts":4}')
+})
+
+test('a refused recovery write retries on the next boot', () => {
+  const key = 'handcash.messages.v1:wallet:main:0:root'
+  const { store, held: native } = memoryNative({ [key]: 'stale' }, new Set([key]))
+  const { origin } = memoryOrigin({ [key]: 'current' })
+
+  assert.equal(moveOriginStorageIntoNative(store, origin).recovered, 0)
+  assert.equal(native.get(key), 'stale')
+  assert.equal(native.has(ORIGIN_RECOVERED_KEY), false)
 })
 
 test('an empty write deletes and the vault flag reaches the store', () => {

@@ -1,12 +1,12 @@
+import '@handcash/wallet-ui/wallet/browserPolyfills'
+import './installBridgeFirst'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import 'aeon-ui-engine/aeon.css'
 import '@aeon-ui/panda/electron.css'
 import '@handcash/wallet-ui/styles/handcash.css'
 import '@handcash/wallet-ui/styles/layout-compact.css'
-import '@handcash/wallet-ui/wallet/browserPolyfills'
 import './mobile-overrides.css'
-import { installMobileBridge } from './bridge'
 import { installBackgroundRuntime } from './backgroundRuntime'
 import { drainNativeCrashReport } from './crashReportNative'
 import { App } from '@handcash/wallet-ui/App'
@@ -16,7 +16,6 @@ import { installCapacitorKeyboard } from './capacitorKeyboard'
 import { installDeepLinks } from './deepLinks'
 import { startMobileChromeTheme } from './mobileChromeTheme'
 
-installMobileBridge()
 installBackgroundRuntime()
 void drainNativeCrashReport()
 

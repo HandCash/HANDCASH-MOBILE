@@ -268,6 +268,11 @@ export function installMobileBridge(): void {
     console.info(
       `[durable] origin move done ${originMoveMs}ms — ${originMove.moved} key(s) (${Math.round(originMove.movedBytes / 1024)}KB) into the app file store · freed ${Math.round(originMove.freedBytes / 1024)}KB of WebView storage`,
     )
+    if (originMove.recovered > 0 || originMove.droppedQueues > 0) {
+      console.info(
+        `[durable] recovered ${originMove.recovered} key(s) the file store held stale · dropped ${originMove.droppedQueues} drained queue(s)`,
+      )
+    }
   }
 
   // Native → JS BRC-100 requests (same path Desktop uses via Electron IPC).
