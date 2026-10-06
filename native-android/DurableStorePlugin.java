@@ -103,7 +103,7 @@ public class DurableStorePlugin extends Plugin {
             "^(?:handcash\\.brc100\\.vault|handcash\\.wallet\\.(?:signedChequeArchive|pendingMinerOutbox|utxoLocks)"
                 + "|handcash\\.brc29\\.pendingOutbox|handcash\\.item\\.pendingOutbox|handcash\\.brc100\\.deviceDek"
                 + "|handcash\\.createdBeef|handcash\\.autoPayReservations|handcash\\.toolboxDatabasePointer"
-                + "|handcash\\.publicIdentities|handcash\\.issuerIdentities)");
+                + "|handcash\\.publicIdentities|handcash\\.issuerIdentities|handcash\\.custodyJournal)");
         /** Identity sentinel for a key known to be absent. */
         private static final String ABSENT = new String("");
 
