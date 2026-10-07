@@ -12,6 +12,8 @@ const systemBrowser = read('native-android/SystemBrowserPlugin.java')
 const mainActivity = read('native-android/MainActivity.java')
 const update = read('src/mobileUpdate.ts')
 const bridge = read('src/bridge.ts')
+const bridgePlugin = read('native-android/Brc100LocalBridgePlugin.java')
+const guestNative = read('src/appBrowserGuestNative.ts')
 
 test('the separate in-app browser activity is gone', () => {
   assert.equal(existsSync(resolve(root, 'native-android/DappBrowserActivity.java')), false)
@@ -29,9 +31,16 @@ test('app tabs are guests of the core browser panel', () => {
   assert.match(bridge, /notePromptOpen[\s\S]{0,200}noteAppBrowserPromptOpen\(open\)/)
 })
 
-test('a guest page carries no wallet interface and reaches the wallet like Chrome', () => {
-  assert.doesNotMatch(guest, /addJavascriptInterface|addWebMessageListener|evaluateJavascript/)
+test('a guest page carries no wallet interface, only the origin-vouched bridge channel', () => {
+  assert.doesNotMatch(guest, /addJavascriptInterface|evaluateJavascript/)
   assert.doesNotMatch(guest, /ReactNativeWebView|HandCashRnWallet|127\.0\.0\.1:3321/)
+  // One listener, and the origin is the WebView's, never the message's.
+  assert.equal(guest.match(/addWebMessageListener\(/g)?.length, 1)
+  assert.match(guest, /dispatchInApp\(method, path, body, sourceOrigin\.toString\(\), reply\)/)
+  assert.doesNotMatch(guest, /optString\("origin"|getString\("origin"/)
+  assert.match(bridgePlugin, /headers\.put\("origin", origin\);[\s\S]{0,400}event\.put\("channel", "in-app"\)/)
+  assert.match(bridge, /native\.channel === 'in-app' \? \{ channel: 'in-app' as const \}/)
+  assert.match(guestNative, /bridgeShim: APP_BROWSER_BRIDGE_SHIM/)
   assert.match(guest, /setAllowFileAccess\(false\)/)
   assert.match(guest, /setAllowContentAccess\(false\)/)
   assert.match(guest, /MIXED_CONTENT_NEVER_ALLOW/)

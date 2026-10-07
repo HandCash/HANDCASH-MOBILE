@@ -56,6 +56,7 @@ type HttpRequestEvent = {
   headers: Record<string, string>
   body: string
   request_id: number
+  channel?: 'in-app'
 }
 
 type HttpResponseEvent = {
@@ -287,6 +288,7 @@ export function installMobileBridge(): void {
       headers: native.headers ?? {},
       body: native.body ?? '',
       request_id: native.requestId,
+      ...(native.channel === 'in-app' ? { channel: 'in-app' as const } : {}),
     }
     for (const l of httpListeners) l(event)
   })
