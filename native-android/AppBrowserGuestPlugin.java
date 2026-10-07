@@ -20,21 +20,29 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.webkit.JavaScriptReplyProxy;
 import androidx.webkit.ProfileStore;
+import androidx.webkit.WebMessageCompat;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginHandle;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Guests for the wallet's browser panel: the Android stand-in for the Electron
@@ -42,9 +50,10 @@ import java.util.Map;
  * the shared UI core; this only draws the page where the panel says.
  *
  * Each guest is a plain WebView laid over the panel's content box inside the
- * wallet activity. It carries no JavaScript interface and no injected bridge:
- * the page reaches the wallet over the local BRC-100 bridge on 127.0.0.1, as it
- * does from Chrome, so origin checks and permission prompts stay the bridge's.
+ * wallet activity. It carries no JavaScript interface into the wallet. Its one
+ * channel only carries the BRC-100 requests the page would have sent to the
+ * local bridge, with the frame origin the WebView reports; origin checks and
+ * permission prompts stay the bridge's ({@link #installBridgeChannel}).
  * Guests use their own storage profile where the WebView supports one.
  *
  * The core moves a guest off screen whenever wallet UI covers the panel, and
@@ -56,6 +65,7 @@ public class AppBrowserGuestPlugin extends Plugin {
     private static final String TAG = "AppBrowserGuest";
     private static final String PROFILE = "handcash-app-browser";
     private static final float OFFSCREEN = -100_000f;
+    private static final String BRIDGE_CHANNEL = "handcashBrc100Channel";
 
     private final Map<String, Guest> guests = new LinkedHashMap<>();
     private FrameLayout layer;
@@ -66,6 +76,7 @@ public class AppBrowserGuestPlugin extends Plugin {
         final String id;
         final WebView view;
         boolean wantsVisible = false;
+        volatile boolean disposed = false;
 
         Guest(String id, WebView view) {
             this.id = id;
@@ -91,6 +102,7 @@ public class AppBrowserGuestPlugin extends Plugin {
                 if (previous != null) dispose(previous);
                 Guest guest = new Guest(id, new WebView(getActivity()));
                 configure(guest);
+                installBridgeChannel(guest, call.getString("bridgeShim"));
                 guests.put(id, guest);
                 layer().addView(guest.view, new FrameLayout.LayoutParams(0, 0));
                 place(guest, call);
@@ -370,6 +382,86 @@ public class AppBrowserGuestPlugin extends Plugin {
         });
     }
 
+    /**
+     * The tab's BRC-100 channel. The WebView names the frame origin of every
+     * message, so a request carried here cannot claim another site, unlike the
+     * loopback socket any app on the phone can reach. The shim routes the
+     * SDK's bridge fetches here; without both WebView features the tab keeps
+     * using the socket.
+     */
+    private void installBridgeChannel(Guest guest, String shim) {
+        if (shim == null || shim.isEmpty()) return;
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)
+                || !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            Log.i(TAG, "bridge channel unsupported by this WebView; app tabs use the loopback bridge");
+            return;
+        }
+        Set<String> everyOrigin = Collections.singleton("*");
+        WebViewCompat.addWebMessageListener(guest.view, BRIDGE_CHANNEL, everyOrigin,
+                (view, message, sourceOrigin, isMainFrame, replyProxy) ->
+                        forwardBridgeMessage(guest, message, sourceOrigin, replyProxy));
+        WebViewCompat.addDocumentStartJavaScript(guest.view, shim, everyOrigin);
+    }
+
+    private void forwardBridgeMessage(
+            Guest guest, WebMessageCompat message, Uri sourceOrigin, JavaScriptReplyProxy replyProxy) {
+        String data = message.getData();
+        if (data == null || data.length() > BoundedHttpRequest.MAX_BODY + 4096) return;
+        final long id;
+        final String method;
+        final String path;
+        final String body;
+        try {
+            JSONObject request = new JSONObject(data);
+            id = request.getLong("id");
+            method = request.optString("method", "POST").toUpperCase(Locale.ROOT);
+            path = request.optString("path", "");
+            body = request.optString("body", "");
+        } catch (JSONException e) {
+            return;
+        }
+        Brc100LocalBridgePlugin.Reply reply = new Brc100LocalBridgePlugin.Reply() {
+            @Override
+            public void send(int status, String responseBody) {
+                String json;
+                try {
+                    json = new JSONObject().put("id", id).put("status", status).put("body", responseBody).toString();
+                } catch (JSONException e) {
+                    return;
+                }
+                getBridge().executeOnMainThread(() -> {
+                    if (guest.disposed) return;
+                    try {
+                        replyProxy.postMessage(json);
+                    } catch (Exception e) {
+                        Log.w(TAG, "bridge reply dropped", e);
+                    }
+                });
+            }
+
+            @Override
+            public void abandon() {
+                send(503, Brc100LocalBridgePlugin.STOPPED_JSON);
+            }
+        };
+        if (!path.startsWith("/") || path.length() > 256) {
+            reply.send(404, "{\"status\":\"error\",\"description\":\"Not found\"}");
+            return;
+        }
+        Brc100LocalBridgePlugin bridge = brc100Bridge();
+        if (bridge == null) {
+            reply.abandon();
+            return;
+        }
+        bridge.dispatchInApp(method, path, body, sourceOrigin.toString(), reply);
+    }
+
+    private Brc100LocalBridgePlugin brc100Bridge() {
+        PluginHandle handle = getBridge().getPlugin("Brc100LocalBridge");
+        Plugin instance = handle == null ? null : handle.getInstance();
+        return instance instanceof Brc100LocalBridgePlugin ? (Brc100LocalBridgePlugin) instance : null;
+    }
+
     private JSObject event(Guest guest, String type) {
         JSObject event = new JSObject();
         event.put("id", guest.id);
@@ -394,6 +486,7 @@ public class AppBrowserGuestPlugin extends Plugin {
     }
 
     private void dispose(Guest guest) {
+        guest.disposed = true;
         WebView view = guest.view;
         if (view.getParent() instanceof ViewGroup) ((ViewGroup) view.getParent()).removeView(view);
         view.stopLoading();

@@ -1,6 +1,9 @@
 import { registerPlugin, type PluginListenerHandle } from '@capacitor/core'
+import { APP_BROWSER_BRIDGE_SHIM } from './appBrowserBridgeShim'
 
-type AppBrowserGuestPlugin = Omit<AppBrowserGuestBridge, 'onEvent'> & {
+type AppBrowserGuestPlugin = Omit<AppBrowserGuestBridge, 'onEvent' | 'create'> & {
+  create(options: Parameters<AppBrowserGuestBridge['create']>[0] & { bridgeShim: string }): Promise<void>
+
   setPromptOpen(options: { open: boolean }): Promise<void>
   addListener(
     event: 'guestEvent',
@@ -17,7 +20,7 @@ const Native = registerPlugin<AppBrowserGuestPlugin>('AppBrowserGuest')
  */
 export function nativeAppBrowserGuest(): AppBrowserGuestBridge {
   return {
-    create: (options) => Native.create(options),
+    create: (options) => Native.create({ ...options, bridgeShim: APP_BROWSER_BRIDGE_SHIM }),
     setBounds: (options) => Native.setBounds(options),
     navigate: (options) => Native.navigate(options),
     capture: (options) => Native.capture(options),

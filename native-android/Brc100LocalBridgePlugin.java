@@ -55,15 +55,54 @@ public class Brc100LocalBridgePlugin extends Plugin {
     private volatile boolean unboundPromptOpen = false;
     private final AtomicInteger requestIds = new AtomicInteger(1);
     private final Map<Integer, Pending> pending = new ConcurrentHashMap<>();
+    private static final int MAX_IN_APP_PENDING = 64;
+    private final AtomicInteger inAppPending = new AtomicInteger(0);
+    private static final String TIMEOUT_JSON =
+            "{\"status\":\"error\",\"code\":\"WALLET_BRIDGE_TIMEOUT\",\"description\":\"No renderer reply\"}";
+    static final String STOPPED_JSON =
+            "{\"status\":\"error\",\"code\":\"WALLET_BRIDGE_STOPPED\",\"description\":\"The HandCash bridge is not running\"}";
+    private static final String BUSY_JSON =
+            "{\"status\":\"error\",\"code\":\"WALLET_BRIDGE_BUSY\",\"description\":\"Too many requests in flight\"}";
+
+    /** Where one request's answer goes: the loopback socket, or an app tab's channel. */
+    interface Reply {
+        void send(int status, String body);
+        /** Release without an answer. */
+        void abandon();
+    }
 
     private static final class Pending {
-        final Socket socket;
-        final String httpVersion;
+        final Reply reply;
         volatile ScheduledFuture<?> deadline;
 
-        Pending(Socket socket, String httpVersion) {
+        Pending(Reply reply) {
+            this.reply = reply;
+        }
+    }
+
+    private final class SocketReply implements Reply {
+        final Socket socket;
+        final String httpVersion;
+
+        SocketReply(Socket socket, String httpVersion) {
             this.socket = socket;
             this.httpVersion = httpVersion;
+        }
+
+        @Override
+        public void send(int status, String body) {
+            try {
+                writeResponse(socket, httpVersion, status, body);
+            } catch (IOException e) {
+                Log.w(TAG, "respond failed", e);
+            } finally {
+                close(socket);
+            }
+        }
+
+        @Override
+        public void abandon() {
+            close(socket);
         }
     }
 
@@ -142,16 +181,92 @@ public class Brc100LocalBridgePlugin extends Plugin {
             return;
         }
         if (p.deadline != null) p.deadline.cancel(false);
-        try { responsePool.execute(() -> {
-            try {
-                writeResponse(p.socket, p.httpVersion, status, body);
-            } catch (IOException e) {
-                Log.w(TAG, "respond failed", e);
-            } finally {
-                close(p.socket);
-            }
-        }); } catch (RejectedExecutionException stopped) { close(p.socket); }
+        ExecutorService pool = responsePool;
+        try {
+            if (pool == null) throw new RejectedExecutionException("bridge stopped");
+            pool.execute(() -> p.reply.send(status, body));
+        } catch (RejectedExecutionException stopped) { p.reply.abandon(); }
         call.resolve();
+    }
+
+    /**
+     * An app tab's request from {@link AppBrowserGuestPlugin}. {@code origin} is
+     * the frame origin the WebView reported for the message, never a value the
+     * page supplied, so the core may honor grants bound to the in-app channel.
+     */
+    void dispatchInApp(String method, String path, String body, String origin, Reply reply) {
+        ScheduledExecutorService timers = deadlines;
+        if (!running || timers == null) {
+            reply.send(503, STOPPED_JSON);
+            return;
+        }
+        String answer = nativeAnswer(method, path);
+        if (answer != null) {
+            reply.send(200, answer);
+            return;
+        }
+        if (inAppPending.incrementAndGet() > MAX_IN_APP_PENDING) {
+            inAppPending.decrementAndGet();
+            reply.send(503, BUSY_JSON);
+            return;
+        }
+        Reply counted = new Reply() {
+            private final java.util.concurrent.atomic.AtomicBoolean done = new java.util.concurrent.atomic.AtomicBoolean();
+
+            @Override
+            public void send(int status, String responseBody) {
+                if (!done.compareAndSet(false, true)) return;
+                inAppPending.decrementAndGet();
+                reply.send(status, responseBody);
+            }
+
+            @Override
+            public void abandon() {
+                send(503, STOPPED_JSON);
+            }
+        };
+        int requestId = requestIds.getAndIncrement();
+        Pending waiting = new Pending(counted);
+        pending.put(requestId, waiting);
+        try {
+            waiting.deadline = timers.schedule(() -> expire(requestId), REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException stopped) {
+            pending.remove(requestId);
+            counted.abandon();
+            return;
+        }
+        JSObject headers = new JSObject();
+        headers.put("origin", origin);
+        JSObject event = new JSObject();
+        event.put("requestId", requestId);
+        event.put("method", method);
+        event.put("path", path);
+        event.put("headers", headers);
+        event.put("body", body);
+        event.put("channel", "in-app");
+        event.put("receivedAtMs", System.currentTimeMillis());
+        notifyListeners("brc100Request", event);
+    }
+
+    /** Discovery answered natively so it never waits on the WebView JS thread. */
+    private static String nativeAnswer(String method, String path) {
+        if ("GET".equals(method) && "/health".equals(path)) {
+            return "{\"ok\":true,\"service\":\"handcash-brc100\",\"bridge\":\"http\",\"platform\":\"android\"}";
+        }
+        if ("GET".equals(method) && "/manifest.json".equals(path)) {
+            return "{"
+                    + "\"short_name\":\"HandCash\","
+                    + "\"name\":\"HandCash Mobile\","
+                    + "\"display\":\"standalone\","
+                    + "\"theme_color\":\"#00d46a\","
+                    + "\"background_color\":\"#07140f\","
+                    + "\"babbage\":{\"trust\":{\"name\":\"HandCash\",\"note\":\"Official HandCash Mobile — keys stay on your device\"}}"
+                    + "}";
+        }
+        if ("POST".equals(method) && ("/getVersion".equals(path) || "getVersion".equals(path))) {
+            return DISCOVERY_VERSION_JSON;
+        }
+        return null;
     }
 
     private void stopServer() {
@@ -176,7 +291,8 @@ public class Brc100LocalBridgePlugin extends Plugin {
         promptRequestId = null;
         unboundPromptOpen = false;
         for (Pending p : pending.values()) {
-            close(p.socket);
+            if (p.deadline != null) p.deadline.cancel(false);
+            p.reply.abandon();
         }
         pending.clear();
         for (Socket socket : clients) close(socket);
@@ -222,41 +338,15 @@ public class Brc100LocalBridgePlugin extends Plugin {
                 return;
             }
 
-            if ("GET".equals(method) && "/health".equals(path)) {
-                writeResponse(
-                        socket,
-                        httpVersion,
-                        200,
-                        "{\"ok\":true,\"service\":\"handcash-brc100\",\"bridge\":\"http\",\"platform\":\"android\"}");
-                close(socket);
-                return;
-            }
-
-            if ("GET".equals(method) && "/manifest.json".equals(path)) {
-                String manifest =
-                        "{"
-                                + "\"short_name\":\"HandCash\","
-                                + "\"name\":\"HandCash Mobile\","
-                                + "\"display\":\"standalone\","
-                                + "\"theme_color\":\"#00d46a\","
-                                + "\"background_color\":\"#07140f\","
-                                + "\"babbage\":{\"trust\":{\"name\":\"HandCash\",\"note\":\"Official HandCash Mobile — keys stay on your device\"}}"
-                                + "}";
-                writeResponse(socket, httpVersion, 200, manifest);
-                close(socket);
-                return;
-            }
-
-            // SDK discovery posts /getVersion — answer natively so detection
-            // does not depend on the WebView JS thread being ready.
-            if ("POST".equals(method) && ("/getVersion".equals(path) || "getVersion".equals(path))) {
-                writeResponse(socket, httpVersion, 200, DISCOVERY_VERSION_JSON);
+            String answer = nativeAnswer(method, path);
+            if (answer != null) {
+                writeResponse(socket, httpVersion, 200, answer);
                 close(socket);
                 return;
             }
 
             int requestId = requestIds.getAndIncrement();
-            pending.put(requestId, new Pending(socket, httpVersion));
+            pending.put(requestId, new Pending(new SocketReply(socket, httpVersion)));
 
             Pending waiting = pending.get(requestId);
             waiting.deadline = deadlines.schedule(() -> expire(requestId), REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS);
@@ -302,12 +392,11 @@ public class Brc100LocalBridgePlugin extends Plugin {
             return;
         }
         if (!pending.remove(id, waiting)) return;
-        try { responsePool.execute(() -> {
-            try { writeResponse(waiting.socket, waiting.httpVersion, 504,
-                "{\"status\":\"error\",\"code\":\"WALLET_BRIDGE_TIMEOUT\",\"description\":\"No renderer reply\"}"); }
-            catch (IOException ignored) { }
-            finally { close(waiting.socket); }
-        }); } catch (RejectedExecutionException stopped) { close(waiting.socket); }
+        ExecutorService pool = responsePool;
+        try {
+            if (pool == null) throw new RejectedExecutionException("bridge stopped");
+            pool.execute(() -> waiting.reply.send(504, TIMEOUT_JSON));
+        } catch (RejectedExecutionException stopped) { waiting.reply.abandon(); }
     }
 
     private void writeResponse(Socket socket, String httpVersion, int status, String body)

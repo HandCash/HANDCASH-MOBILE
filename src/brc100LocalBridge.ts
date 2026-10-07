@@ -8,6 +8,8 @@ type NativeRequest = {
   body: string
   /** Native accept time (epoch ms); absent on builds before the field. */
   receivedAtMs?: number
+  /** `in-app`: an app tab's message channel; the origin header is the WebView's. */
+  channel?: string
 }
 
 type Brc100LocalBridgePlugin = {
