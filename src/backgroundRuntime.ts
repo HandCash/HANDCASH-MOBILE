@@ -7,6 +7,7 @@ import {
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { appendAppLog } from '@desktop/wallet/appLog'
 import { appDisplayName } from '@desktop/wallet/appIdentity'
+import { logBackgroundHealth, requestBackgroundExemptionOnce } from './backgroundHealthNative'
 import { nativeBringToFront } from './deviceAuthNative'
 
 const SYNC_CHANNEL = 'handcash-sync'
@@ -362,10 +363,24 @@ export function installBackgroundRuntime(): void {
   })
   document.addEventListener('visibilitychange', notifyScreenWatchers)
 
+  let hiddenSince: number | null = document.visibilityState === 'hidden' ? Date.now() : null
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      hiddenSince ??= Date.now()
+      return
+    }
+    if (hiddenSince == null) return
+    const hiddenMs = Date.now() - hiddenSince
+    hiddenSince = null
+    void logBackgroundHealth(hiddenMs)
+  })
+
   document.addEventListener('handcash:wallet-unlocked', () => {
     walletUnlocked = true
     void ensureNotifications()
-    void startForegroundSync()
+    void startForegroundSync().then(() => {
+      if (foregroundRunning) void requestBackgroundExemptionOnce()
+    })
   })
   document.addEventListener('handcash:wallet-locked', () => {
     walletUnlocked = false

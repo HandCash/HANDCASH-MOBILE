@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         CrashReportPlugin.install(this);
+        registerPlugin(BackgroundHealthPlugin.class);
         registerPlugin(Brc100LocalBridgePlugin.class);
         registerPlugin(Brc39ArchivePlugin.class);
         registerPlugin(CrashReportPlugin.class);

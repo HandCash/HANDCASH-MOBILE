@@ -65,6 +65,14 @@ function patchManifest(src) {
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="${FGS_SUBTYPE}" />
         </service>`,
   )
+  // The foreground service's wake lock is ignored in Doze unless the app is
+  // exempt; BackgroundHealthPlugin asks once at unlock.
+  if (!m.includes('REQUEST_IGNORE_BATTERY_OPTIMIZATIONS')) {
+    m = m.replace(
+      /<manifest([^>]*)>/,
+      `<manifest$1>\n    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />`,
+    )
+  }
   if (!m.includes('USE_FULL_SCREEN_INTENT')) {
     m = m.replace(
       /(<uses-permission android:name="android.permission.POST_NOTIFICATIONS" \/>)/,
