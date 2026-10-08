@@ -83,6 +83,9 @@ export default defineConfig({
         replacement: path.join(DESKTOP_AEON, 'packages/tree/src/index.ts'),
       },
       { find: '@', replacement: DESKTOP_SRC },
+      // `<Profiler onRender>` is a no-op in the plain production build; the
+      // profiling build keeps it so `[render]` lines name the slow surface.
+      { find: /^react-dom\/client$/, replacement: 'react-dom/profiling' },
       // Named UI core — same tree as @desktop (legacy alias kept for gradual migrate).
       {
         find: /^@handcash\/wallet-ui\/(.*)/,
