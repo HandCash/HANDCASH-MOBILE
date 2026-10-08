@@ -158,6 +158,9 @@ export default defineConfig({
       allow: [DESKTOP_ROOT, __dirname],
     },
   },
+  // `[loaf]` freeze lines name the function that held the main thread; mangled
+  // identifiers would make every name meaningless in uploaded logs.
+  esbuild: { minifyIdentifiers: false },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
