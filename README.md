@@ -63,7 +63,7 @@ QR scanning uses `@zxing/browser` when the WebView has no `BarcodeDetector` (typ
 
 | Feature | Mobile |
 |---------|--------|
-| UI / vault / backups / identity handoff | Same UI core (BRC-75 phrase / BRC-140 shares) |
+| UI / vault / backups / identity handoff | Same UI core (BRC-157 phrase, BRC-75 for older vaults / BRC-140 shares) |
 | Device link (scan QR + BRC-39 sync) | Same pair UX; camera via zxing fallback |
 | BRC-100 LAN bridge | Native loopback `:3321` when the Android app is running |
 | LAN device-peer (`:3340`) | Not yet — cloud History URL is the multi-device path |
