@@ -241,7 +241,7 @@ ensureDataExtractionRules()
 const nativeDst = path.join(androidRoot, 'app/src/main/java/io/handcash/mobile')
 // `android/` persists between builds, so a source deleted here would otherwise
 // keep compiling from the last copy.
-const RETIRED_NATIVE = ['DappBrowserActivity.java', 'DappBrowserPlugin.java']
+const RETIRED_NATIVE = ['DappBrowserActivity.java', 'DappBrowserPlugin.java', 'DirectSessionPlugin.java']
 for (const name of RETIRED_NATIVE) {
   fs.rmSync(path.join(nativeDst, name), { force: true })
 }
