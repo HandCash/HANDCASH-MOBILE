@@ -22,7 +22,14 @@ test('the separate in-app browser activity is gone', () => {
   assert.doesNotMatch(bridge, /openAppBrowser|DappBrowser/)
   // Old installs keep their android/ tree: strip the manifest entry and the copies.
   assert.match(patcher, /\.DappBrowserActivity/)
-  assert.match(patcher, /RETIRED_NATIVE = \['DappBrowserActivity\.java', 'DappBrowserPlugin\.java'\]/)
+  assert.match(patcher, /RETIRED_NATIVE = \[[^\]]*'DappBrowserActivity\.java', 'DappBrowserPlugin\.java'/)
+})
+
+test('direct sessions run in the WebView, with no native socket', () => {
+  assert.equal(existsSync(resolve(root, 'native-android/DirectSessionPlugin.java')), false)
+  assert.doesNotMatch(mainActivity, /DirectSessionPlugin/)
+  assert.doesNotMatch(bridge, /directSession/i)
+  assert.match(patcher, /RETIRED_NATIVE = \[[^\]]*'DirectSessionPlugin\.java'/)
 })
 
 test('app tabs are guests of the core browser panel', () => {
