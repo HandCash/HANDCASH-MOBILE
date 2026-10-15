@@ -101,12 +101,12 @@ export default defineConfig({
       // node_modules may be absent during a parallel/clean mobile-only build).
       // Exact-match only — prefix aliases break @bsv/sdk package exports
       // (e.g. @bsv/sdk/primitives/AESGCM → dist/esm/...).
-      // Prefer Desktop's pinned and custody-patched Toolbox build.
+      // One owned wallet engine for both shells.
       {
-        find: /^@bsv\/wallet-toolbox-client$/,
+        find: /^@handcash\/wallet-engine$/,
         replacement: path.resolve(
           DESKTOP_ROOT,
-          'node_modules/@bsv/wallet-toolbox-client',
+          'packages/wallet-engine/dist/index.mjs',
         ),
       },
       {
@@ -133,7 +133,7 @@ export default defineConfig({
       'xstate',
       '@xstate/react',
       '@bsv/sdk',
-      '@bsv/wallet-toolbox-client',
+      '@handcash/wallet-engine',
     ],
   },
   optimizeDeps: {
@@ -143,7 +143,7 @@ export default defineConfig({
       'react',
       'react-dom',
       '@bsv/sdk',
-      '@bsv/wallet-toolbox-client',
+      '@handcash/wallet-engine',
       'html5-qrcode',
       '@zxing/browser',
       '@zxing/library',
