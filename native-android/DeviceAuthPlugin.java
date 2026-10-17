@@ -21,6 +21,7 @@ import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
+import androidx.lifecycle.Lifecycle;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -122,6 +123,28 @@ public class DeviceAuthPlugin extends Plugin {
     }
 
     /**
+     * When a prompt pulled the wallet in front of the app the user was in
+     * (Chrome, usually). Set only when the wallet was not already resumed, so
+     * approving from inside the wallet never sends it away. Mirrors Desktop's
+     * `promptStoleFocusAt` in electron/main.ts.
+     */
+    private long promptStoleFocusAt = 0;
+    private static final long PROMPT_FOCUS_RETURN_WINDOW_MS = 10 * 60_000L;
+    /** The core re-raises right after the first raise for OEM races. */
+    private static final long PROMPT_FOCUS_RETRY_MS = 2_000L;
+
+    private void notePromptRaise(FragmentActivity activity) {
+        boolean wasInFront = activity != null
+                && activity.getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED);
+        long now = System.currentTimeMillis();
+        if (!wasInFront) {
+            if (promptStoleFocusAt == 0) promptStoleFocusAt = now;
+        } else if (now - promptStoleFocusAt > PROMPT_FOCUS_RETRY_MS) {
+            promptStoleFocusAt = 0;
+        }
+    }
+
+    /**
      * Bring the wallet to the foreground when a BRC-100 permission prompt is waiting.
      * Prefer AppTask.moveToFront (reliable when backgrounded); fall back to launch intent.
      */
@@ -134,6 +157,7 @@ public class DeviceAuthPlugin extends Plugin {
             return;
         }
         Runnable work = () -> {
+            notePromptRaise(getActivity());
             try {
                 Context ctx = activity != null ? activity : context;
                 ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
@@ -196,6 +220,38 @@ public class DeviceAuthPlugin extends Plugin {
         } else {
             new Handler(Looper.getMainLooper()).post(work);
         }
+    }
+
+    /**
+     * Nothing left to approve. The screen may sleep again, and when a prompt
+     * pulled the wallet over another app, that app comes back: moving this
+     * task behind returns the previous one with its page as the user left it,
+     * and the request it is waiting on still completes from here. Reopening
+     * the app's URL instead would load a new tab and lose its state.
+     */
+    @PluginMethod
+    public void releasePromptFocus(PluginCall call) {
+        final Activity activity = getActivity();
+        final long stoleAt = promptStoleFocusAt;
+        promptStoleFocusAt = 0;
+        if (activity == null) {
+            call.resolve(new JSObject());
+            return;
+        }
+        activity.runOnUiThread(() -> {
+            try {
+                activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            } catch (Exception ignored) {
+                // Window may be unavailable while stopped.
+            }
+            boolean returned = false;
+            if (stoleAt != 0 && System.currentTimeMillis() - stoleAt <= PROMPT_FOCUS_RETURN_WINDOW_MS) {
+                returned = activity.moveTaskToBack(true);
+            }
+            JSObject result = new JSObject();
+            result.put("returned", returned);
+            call.resolve(result);
+        });
     }
 
     private int allowedAuthenticators() {

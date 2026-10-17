@@ -28,6 +28,8 @@ let notificationsReady = false
 let notificationsSetup: Promise<boolean> | null = null
 let lastNotifiedUpdateVersion: string | null = null
 let nextNotificationId = Math.floor(Date.now() % 1_900_000_000)
+/** Bumped per permission prompt and per answer; a stale raise retry sees a newer value. */
+let promptRaise = 0
 
 /** Foreground service, battery exemption and channels exist only on Android. */
 function androidShell(): boolean {
@@ -421,17 +423,24 @@ export function installBackgroundRuntime(): void {
         appName?: string
       }>).detail ?? {}
     // focusWindow already runs from Desktop permissions; re-fire + retry for OEM races.
-    void nativeBringToFront()
-    window.setTimeout(() => void nativeBringToFront(), 280)
-    window.setTimeout(() => void nativeBringToFront(), 900)
+    // A retry after the answer would undo the core's return to the caller.
+    const raise = ++promptRaise
+    const retry = () => {
+      if (promptRaise === raise) void nativeBringToFront()
+    }
+    retry()
+    window.setTimeout(retry, 280)
+    window.setTimeout(retry, 900)
     runNotification('permission', () => notifyPermissionRequest(detail))
   })
   document.addEventListener('handcash:wallet-connected', (event) => {
+    promptRaise++
     const detail =
       (event as CustomEvent<{ appName?: string; origin?: string }>).detail ?? {}
     runNotification('connected', () => notifyWalletConnected(detail))
   })
   document.addEventListener('handcash:permission-dismissed', () => {
+    promptRaise++
     void dismissPermissionNotification()
   })
   document.addEventListener('handcash:update-available', (event) => {
