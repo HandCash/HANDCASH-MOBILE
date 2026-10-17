@@ -29,6 +29,11 @@ let notificationsSetup: Promise<boolean> | null = null
 let lastNotifiedUpdateVersion: string | null = null
 let nextNotificationId = Math.floor(Date.now() % 1_900_000_000)
 
+/** Foreground service, battery exemption and channels exist only on Android. */
+function androidShell(): boolean {
+  return Capacitor.getPlatform() === 'android'
+}
+
 function allocateNotificationId(): number {
   nextNotificationId = (nextNotificationId + 1) % 1_900_000_000
   return Math.max(1, nextNotificationId)
@@ -45,6 +50,11 @@ async function setupNotifications(): Promise<boolean> {
     if (permission.display !== 'granted') {
       appendAppLog('warn', '[mobile-notifications] display permission denied')
       return false
+    }
+    // Channels are Android's; iOS answers createChannel as unimplemented.
+    if (!androidShell()) {
+      notificationsReady = true
+      return true
     }
     await LocalNotifications.createChannel({
       id: RECEIVE_CHANNEL,
@@ -109,7 +119,7 @@ function runNotification(label: string, task: () => Promise<void>): void {
 // call, and each extra startForegroundService arms Android's startForeground
 // deadline, which kills the whole process when missed.
 async function startForegroundSync(): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return
+  if (!androidShell()) return
   if (foregroundRunning) return
   try {
     const permission = await ForegroundService.requestPermissions()
@@ -372,7 +382,7 @@ export function installBackgroundRuntime(): void {
     if (hiddenSince == null) return
     const hiddenMs = Date.now() - hiddenSince
     hiddenSince = null
-    void logBackgroundHealth(hiddenMs)
+    if (androidShell()) void logBackgroundHealth(hiddenMs)
   })
 
   document.addEventListener('handcash:wallet-unlocked', () => {

@@ -111,10 +111,23 @@ function injectWebViewWalletHint(): void {
   }
 }
 
+const sideloadUpdates = {
+  getUpdateStatus: async () => getMobileUpdateStatus(),
+  checkForUpdates: async () => checkMobileUpdates({ reason: 'manual' }),
+  downloadUpdate: async () => downloadMobileUpdate(),
+  setUpdateMode: async (mode: 'default' | 'manual' | 'none') => setMobileUpdateMode(mode),
+  installUpdate: async () => installMobileUpdate(),
+  onUpdateStatus: (handler: (status: UpdateStatus) => void) => onMobileUpdateStatus(handler),
+}
+
 export function installMobileBridge(): void {
   if (window.handcash) return
 
   const platform = detectPlatform()
+  // iOS has no local BRC-100 server, no native app-tab guest and no sideload
+  // updates (TestFlight / App Store deliver builds). The core treats each
+  // missing bridge method as "not on this shell".
+  const ios = platform === 'ios'
   const durable = nativeDurableStore()
   let originMove: OriginMove | null = null
   let originMoveMs = 0
@@ -181,7 +194,7 @@ export function installMobileBridge(): void {
     },
     // The core's browser panel draws app tabs through a native WebView laid
     // over it, as Desktop does with `<webview>`. `openExternal` is Chrome.
-    appBrowserGuest: nativeAppBrowserGuest(),
+    ...(ios ? {} : { appBrowserGuest: nativeAppBrowserGuest() }),
     getLogInfo: async () => ({ file: null, dir: null }),
     openLogs: async () => ({ ok: false as const, error: 'Finder reveal is Desktop-only' }),
     readLogs: async () => {
@@ -246,12 +259,7 @@ export function installMobileBridge(): void {
       error: 'Screenshot copy is Desktop-only',
     }),
     onScreenshotCopied: () => () => undefined,
-    getUpdateStatus: async () => getMobileUpdateStatus(),
-    checkForUpdates: async () => checkMobileUpdates({ reason: 'manual' }),
-    downloadUpdate: async () => downloadMobileUpdate(),
-    setUpdateMode: async (mode: 'default' | 'manual' | 'none') => setMobileUpdateMode(mode),
-    installUpdate: async () => installMobileUpdate(),
-    onUpdateStatus: (handler: (status: UpdateStatus) => void) => onMobileUpdateStatus(handler),
+    ...(ios ? {} : sideloadUpdates),
   }
 
   Object.defineProperty(window, 'handcash', {
@@ -272,6 +280,11 @@ export function installMobileBridge(): void {
         `[durable] recovered ${originMove.recovered} key(s) the file store held stale · dropped ${originMove.droppedQueues} drained queue(s)`,
       )
     }
+  }
+
+  if (ios) {
+    applyBridgeHttpUrl(null, 'The local BRC-100 bridge is not available on iPhone yet')
+    return
   }
 
   // Native → JS BRC-100 requests (same path Desktop uses via Electron IPC).
