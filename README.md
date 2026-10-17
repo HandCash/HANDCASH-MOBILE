@@ -99,6 +99,7 @@ QR scanning uses `@zxing/browser` when the WebView has no `BarcodeDetector` (typ
 | UI / vault / backups / identity handoff | Same UI core (BRC-157 phrase, BRC-75 for older vaults / BRC-140 shares) |
 | Device link (scan QR + BRC-39 sync) | Same pair UX; camera via zxing fallback |
 | BRC-100 LAN bridge | Native loopback `:3321` when the Android app is running; not on iOS yet |
+| Connected apps | Android opens them in a tab inside the wallet by default (WebView message channel, no socket, no app switch). From Chrome, the wallet steps back to Chrome once every prompt is answered. |
 | LAN device-peer (`:3340`) | Not yet — cloud History URL is the multi-device path |
 | OS keychain seal | Android DeviceAuth prefers StrongBox (hardware SE) then TEE; iOS keeps the unlock key in the Keychain behind Face ID / Touch ID / passcode, this device only; password wrap fallback |
 | Auto-update | Android sideload; iOS TestFlight |

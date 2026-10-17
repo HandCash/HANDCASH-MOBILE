@@ -10,6 +10,7 @@ import android.util.Base64;
 import android.util.Log;
 import android.view.ViewGroup;
 import android.webkit.CookieManager;
+import android.webkit.ValueCallback;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -20,6 +21,8 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.webkit.JavaScriptReplyProxy;
 import androidx.webkit.ProfileStore;
 import androidx.webkit.WebMessageCompat;
@@ -71,6 +74,27 @@ public class AppBrowserGuestPlugin extends Plugin {
     private FrameLayout layer;
     private boolean promptOpen = false;
     private OnBackPressedCallback back;
+    private ActivityResultLauncher<Intent> filePicker;
+    private ValueCallback<Uri[]> pendingFiles;
+
+    /** Launchers must be registered before the activity starts, so here and not per guest. */
+    @Override
+    public void load() {
+        try {
+            filePicker = getActivity().registerForActivityResult(
+                    new ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        ValueCallback<Uri[]> callback = pendingFiles;
+                        pendingFiles = null;
+                        if (callback == null) return;
+                        callback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(
+                                result.getResultCode(), result.getData()));
+                    });
+        } catch (Exception e) {
+            Log.w(TAG, "file chooser launcher unavailable; app tabs cannot pick files", e);
+            filePicker = null;
+        }
+    }
 
     private static final class Guest {
         final String id;
@@ -142,6 +166,9 @@ public class AppBrowserGuestPlugin extends Plugin {
                         break;
                     case "reload":
                         guest.view.reload();
+                        break;
+                    case "stop":
+                        guest.view.stopLoading();
                         break;
                     default:
                         break;
@@ -326,7 +353,35 @@ public class AppBrowserGuestPlugin extends Plugin {
 
         view.setDownloadListener((url, userAgent, contentDisposition, mimeType, length) ->
                 handOff(Uri.parse(url)));
-        view.setWebChromeClient(new WebChromeClient());
+        view.setWebChromeClient(new WebChromeClient() {
+            /** A bare WebChromeClient ignores `<input type="file">`; the tap did nothing. */
+            @Override
+            public boolean onShowFileChooser(
+                    WebView v, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (filePicker == null) return false;
+                if (pendingFiles != null) pendingFiles.onReceiveValue(null);
+                pendingFiles = callback;
+                try {
+                    Intent pick = params.createIntent();
+                    if (params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) {
+                        pick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                    }
+                    filePicker.launch(pick);
+                    return true;
+                } catch (Exception e) {
+                    pendingFiles = null;
+                    Log.w(TAG, "file chooser unavailable", e);
+                    return false;
+                }
+            }
+
+            @Override
+            public void onProgressChanged(WebView v, int progress) {
+                JSObject event = event(guest, "progress");
+                event.put("progress", progress);
+                notifyListeners("guestEvent", event);
+            }
+        });
         view.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView v, String url, Bitmap favicon) {

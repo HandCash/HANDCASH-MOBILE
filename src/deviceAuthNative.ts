@@ -15,6 +15,7 @@ type DeviceAuthPlugin = {
   unlock(options?: { reason?: string }): Promise<{ ok?: boolean; secret?: string; password?: string }>
   clear(): Promise<void>
   bringToFront(): Promise<void>
+  releasePromptFocus(): Promise<{ returned?: boolean }>
 }
 
 const Native = registerPlugin<DeviceAuthPlugin>('DeviceAuth')
@@ -62,5 +63,17 @@ export async function nativeBringToFront(): Promise<void> {
     await Native.bringToFront()
   } catch {
     // OEM may block background startActivity — notification path still covers it.
+  }
+}
+
+/**
+ * Every prompt answered: let the screen sleep again, and when a prompt pulled
+ * the wallet over another app, send the wallet behind it. True when it did.
+ */
+export async function nativeReleasePromptFocus(): Promise<boolean> {
+  try {
+    return (await Native.releasePromptFocus()).returned === true
+  } catch {
+    return false
   }
 }

@@ -13,6 +13,7 @@ import {
 } from './brc100LocalBridge'
 import {
   nativeBringToFront,
+  nativeReleasePromptFocus,
   nativeDeviceAuthClear,
   nativeDeviceAuthEnroll,
   nativeDeviceAuthStatus,
@@ -184,6 +185,15 @@ export function installMobileBridge(): void {
     focusWindow: async () => {
       await nativeBringToFront()
     },
+    // Android only: iOS never raises the wallet over another app, so there is
+    // nothing to give back.
+    ...(ios
+      ? {}
+      : {
+          releasePromptFocus: async () => {
+            if (await nativeReleasePromptFocus()) console.info('[prompt] returned to the app that asked')
+          },
+        }),
     // Must leave the app, like Desktop's shell.openExternal. `window.open`
     // from this WebView is not a handoff — Android may swallow it or render
     // the page in a wallet-owned surface Desktop has no equivalent of.
