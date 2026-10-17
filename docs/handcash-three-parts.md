@@ -14,7 +14,7 @@ Desktop and Mobile must **never** drift into two wallet UIs. The clever cut is n
 ┌───────────────────────┐                 ┌───────────────────────┐
 │ Desktop shell         │                 │ Mobile shell          │
 │ electron/ + main.tsx  │                 │ Capacitor + bridge    │
-│ BRC-100, auto-update  │                 │ APK, native plugins   │
+│ BRC-100, auto-update  │                 │ APK / iOS, plugins    │
 └───────────────────────┘                 └───────────────────────┘
 ```
 
@@ -32,8 +32,9 @@ Desktop and Mobile must **never** drift into two wallet UIs. The clever cut is n
 
 1. Mobile `package.json` depends on `"@handcash/wallet-ui": "file:../HANDCASH-DESKTOP/packages/wallet-ui"`.
 2. Vite aliases `@handcash/wallet-ui/*` and legacy `@desktop/*` to the same `src` tree.
-3. `bash scripts/build-apk.sh` runs `node scripts/assert-ui-core.mjs` before build — fails if Desktop is missing, versions disagree, or the Desktop worktree is dirty.
-4. Release assets include `ui-core-pin.json` next to the APK so support can see exactly which Desktop SHA the phone is running.
+3. `bash scripts/build-apk.sh` and `bash scripts/build-ios.sh` run `node scripts/assert-ui-core.mjs` before build — fails if Desktop is missing, versions disagree, or the Desktop worktree is dirty.
+4. Release assets include `ui-core-pin.json` next to the APK so support can see exactly which Desktop SHA the phone is running; iOS builds write `artifacts/handcash-mobile-<ver>.ios.ui-core-pin.json`.
+5. iOS is the same Mobile shell, not a third app: `native-android/` and `native-ios/` implement one plugin contract (`src/*Native.ts`), and `src/bridge.ts` leaves out what a platform lacks so the core falls back.
 
 ## What we deliberately did *not* do (yet)
 
