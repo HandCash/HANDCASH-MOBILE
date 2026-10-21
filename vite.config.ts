@@ -26,6 +26,10 @@ const DESKTOP_AEON = path.join(DESKTOP_ROOT, 'vendor/aeon-ui-engine')
  * built an engine that had never heard of it, dropped it into the DOM spread,
  * and fell back to the trigger anchor. Rebase every engine alias onto
  * Desktop's vendored tree so the two shells cannot diverge again.
+ *
+ * Panda 2 emits `styled-system/{css,recipes}/index.js` where the pinned engine names
+ * `index.mjs`; an alias with no Desktop counterpart fails the build rather
+ * than falling back to the pinned engine (that fallback lost `aeonProse`).
  */
 function desktopAeonAliases() {
   const marker = `${path.sep}aeon-ui-engine${path.sep}`
@@ -34,7 +38,15 @@ function desktopAeonAliases() {
     const at = to.lastIndexOf(marker)
     if (at === -1) return alias
     const rebased = path.join(DESKTOP_AEON, to.slice(at + marker.length))
-    return fs.existsSync(rebased) ? { ...alias, replacement: rebased } : alias
+    const found = [rebased, rebased.replace(/\.mjs$/, '.js')].find((p) =>
+      fs.existsSync(p),
+    )
+    if (!found) {
+      throw new Error(
+        `[aeon] ${String(alias.find)} has no counterpart in Desktop's vendored engine (${rebased})`,
+      )
+    }
+    return { ...alias, replacement: found }
   })
 }
 
