@@ -1,11 +1,12 @@
 {
   "name": "handcash-mobile",
-  "version": "0.1.764",
+  "version": "0.2.0",
   "private": true,
-  "description": "HandCash Mobile — Capacitor shell over @handcash/wallet-ui (Desktop src).",
+  "description": "HandCash Mobile \u2014 Capacitor shell over @handcash/wallet-ui (Desktop src).",
   "type": "module",
   "license": "Open BSV License",
   "dependencies": {
+    "@bsv/ecpm-permission-module": "file:../HANDCASH-DESKTOP/vendor/permission-ux/bsv-ecpm-permission-module-0.1.4-session.tgz",
     "@bsv/sdk": "^2.8.1",
     "@bsv/verifast": "^0.3.6",
     "@capacitor/android": "^7.4.2",
@@ -42,7 +43,8 @@
     "ios:testflight": "HANDCASH_IOS_UPLOAD=1 bash scripts/build-ios.sh",
     "test:ios-native": "bash scripts/test-ios-native.sh",
     "assert:ui-core": "node scripts/assert-ui-core.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:ecpm": "node scripts/test-ecpm.mjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.4.2",

@@ -1,0 +1,40 @@
+name: ECPM shared-core integration
+on:
+  pull_request:
+  push:
+    branches: [master]
+permissions:
+  contents: read
+jobs:
+  ecpm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: HANDCASH-MOBILE
+      - name: Read pinned core
+        id: core
+        working-directory: HANDCASH-MOBILE
+        run: node -e "require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'sha=' + require('./ui-core-source.json').gitSha + '\n')"
+      - uses: actions/checkout@v4
+        with:
+          repository: HandCash/HANDCASH-DESKTOP
+          ref: ${{ steps.core.outputs.sha }}
+          path: HANDCASH-DESKTOP
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.1'
+          cache: npm
+          cache-dependency-path: HANDCASH-MOBILE/package-lock.json
+      - name: Install and build shared engine
+        working-directory: HANDCASH-DESKTOP
+        run: npm ci --ignore-scripts && npm run build:wallet-engine
+      - name: Install shell
+        working-directory: HANDCASH-MOBILE
+        run: npm ci --ignore-scripts
+      - name: Verify core pin, ECPM and app-tab bridge
+        working-directory: HANDCASH-MOBILE
+        run: npm run assert:ui-core && npm run test:ecpm && npm test
+      - name: Production renderer build
+        working-directory: HANDCASH-MOBILE
+        run: npm run build

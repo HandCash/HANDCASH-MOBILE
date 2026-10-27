@@ -91,3 +91,17 @@ test('installs once and only where the channel exists', () => {
   new Function('window', APP_BROWSER_BRIDGE_SHIM)(bare)
   assert.equal(bare.fetch, original)
 })
+
+test('ECPM uses the existing getPublicKey relay with unchanged arguments and denial status', async () => {
+  const t = tab()
+  const args = { protocolID: [2, `p ecpm apply ${'02' + '11'.repeat(32)} mental poker deal`], keyID: 'deck', counterparty: 'self', privileged: true, privilegedReason: 'Protected shuffle', seekPermission: false }
+  const body = JSON.stringify(args)
+  const pending = t.fetch('http://localhost:3321/getPublicKey', { method: 'POST', body })
+  await t.flush()
+  assert.deepEqual(t.posted, [{ id: 1, method: 'POST', path: '/getPublicKey', body }])
+  t.reply(1, 403, JSON.stringify({ code: 'PERMISSION_DENIED' }))
+  const response = await pending
+  assert.equal(response.status, 403)
+  assert.deepEqual(await response.json(), { code: 'PERMISSION_DENIED' })
+  assert.equal(t.pageCalls.length, 0)
+})
