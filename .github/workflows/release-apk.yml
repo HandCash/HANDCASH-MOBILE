@@ -72,22 +72,22 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Building HandCash Mobile ${VERSION} → release ${TAG}"
 
-      - name: Restore stable release signer
+      - name: Restore lab keystore from private secret
         env:
-          KEYSTORE_BASE64: ${{ secrets.HANDCASH_ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_BASE64: ${{ secrets.HANDCASH_ANDROID_LAB_KEYSTORE_BASE64 }}
         run: |
-          test -n "$KEYSTORE_BASE64" || { echo "Stable signing keystore secret is required" >&2; exit 1; }
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/handcash-release.keystore"
-          chmod 600 "$RUNNER_TEMP/handcash-release.keystore"
+          # Never commit *.keystore — this repo is public. Secret only.
+          test -n "$KEYSTORE_BASE64" || {
+            echo "Set Actions secret HANDCASH_ANDROID_LAB_KEYSTORE_BASE64 (base64 of handcash-lab.keystore)" >&2
+            exit 1
+          }
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > HANDCASH-MOBILE/native-android/handcash-lab.keystore
+          chmod 600 HANDCASH-MOBILE/native-android/handcash-lab.keystore
 
       - name: Build APK
         working-directory: HANDCASH-MOBILE
         env:
-          HANDCASH_ANDROID_KEYSTORE: ${{ runner.temp }}/handcash-release.keystore
-          HANDCASH_ANDROID_STORE_PASSWORD: ${{ secrets.HANDCASH_ANDROID_STORE_PASSWORD }}
-          HANDCASH_ANDROID_KEY_ALIAS: ${{ secrets.HANDCASH_ANDROID_KEY_ALIAS }}
-          HANDCASH_ANDROID_KEY_PASSWORD: ${{ secrets.HANDCASH_ANDROID_KEY_PASSWORD }}
-          HANDCASH_ANDROID_CERT_SHA256: ${{ secrets.HANDCASH_ANDROID_CERT_SHA256 }}
+          HANDCASH_BUILD_TYPE: debug
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

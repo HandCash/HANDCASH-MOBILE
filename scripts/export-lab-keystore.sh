@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # One-time on the Mac that already installs on your phone: export the debug key
-# every build host must share. Copy native-android/handcash-lab.keystore to Linux.
+# every build host must share. File is gitignored — never commit (repo is public).
+# For CI:  base64 -w0 native-android/handcash-lab.keystore | gh secret set HANDCASH_ANDROID_LAB_KEYSTORE_BASE64
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="${HANDCASH_ANDROID_KEYSTORE:-$HOME/.android/debug.keystore}"
@@ -10,5 +11,6 @@ if [[ ! -f "$SRC" ]]; then
   exit 1
 fi
 cp "$SRC" "$DST"
-echo "Wrote $DST"
-echo "Commit or scp this file to your Linux build host, then rebuild the APK."
+chmod 600 "$DST"
+echo "Wrote $DST (gitignored — do not commit)"
+echo "scp to your Linux build host, or: base64 -w0 \"$DST\" | gh secret set HANDCASH_ANDROID_LAB_KEYSTORE_BASE64 --repo HandCash/HANDCASH-MOBILE"

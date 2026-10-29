@@ -10,3 +10,10 @@ artifacts/
 local.properties
 *.apk
 *.aab
+
+# Signing material — never commit. CI restores from GitHub Actions secrets.
+*.keystore
+*.jks
+*.p12
+native-android/handcash-lab.keystore
+native-android/handcash-release.keystore

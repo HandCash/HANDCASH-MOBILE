@@ -151,11 +151,22 @@ function patchGradle(src, version, versionCode) {
     )
   }
 
-  // Release signing always comes from the stable private CI/local configuration.
-  // The lab certificate remains an explicit debug-only option for installed lab wallets.
+  // Release signing from private CI/local env. Lab keystore is debug-only and
+  // must never be committed (public repo) — CI restores it from a secret.
   if (!g.includes('handcashRelease')) {
-    g = g.replace(/android \{\n/, `android {
-    signingConfigs {
+    const labBlock = fs.existsSync(keystorePath)
+      ? `
+        lab {
+            storeFile file("../../native-android/handcash-lab.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }`
+      : ''
+    g = g.replace(
+      /android \{\n/,
+      `android {
+    signingConfigs {${labBlock}
         handcashRelease {
             def keyPath = System.getenv("HANDCASH_ANDROID_KEYSTORE")
             if (keyPath) storeFile file(keyPath)
@@ -164,10 +175,24 @@ function patchGradle(src, version, versionCode) {
             keyPassword System.getenv("HANDCASH_ANDROID_KEY_PASSWORD")
         }
     }
-`)
-    g = g.replace(/release \{/, `release {
+`,
+    )
+    if (fs.existsSync(keystorePath)) {
+      g = g.replace(
+        /buildTypes \{\n\s*release \{/,
+        `buildTypes {
+        debug {
+            signingConfig signingConfigs.lab
+        }
+        release {`,
+      )
+    }
+    g = g.replace(
+      /release \{/,
+      `release {
             signingConfig signingConfigs.handcashRelease
-            debuggable false`)
+            debuggable false`,
+    )
   }
 
   return g

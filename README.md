@@ -36,14 +36,14 @@ Android refuses an APK when it is signed with a **different key** than the app a
 
 ```bash
 bash scripts/export-lab-keystore.sh
-# copies ~/.android/debug.keystore → native-android/handcash-lab.keystore
+# copies ~/.android/debug.keystore → native-android/handcash-lab.keystore (gitignored)
 ```
 
-Copy `native-android/handcash-lab.keystore` to your Linux box (or commit it for the team). Rebuild — Linux APKs will upgrade Mac installs.
+Keep that file **local only** — never commit it (this repo is public). For CI, store it as the private Actions secret `HANDCASH_ANDROID_LAB_KEYSTORE_BASE64`. scp the file to your Linux box for local builds. Rebuild — Linux APKs will upgrade Mac installs.
 
 **Quick test:** uninstall HandCash from the phone, then sideload the Linux APK.
 
-Or point at any keystore: `HANDCASH_ANDROID_KEYSTORE=/path/to/debug.keystore bash scripts/build-apk.sh`
+Or point at any keystore: `HANDCASH_ANDROID_LAB_KEYSTORE=/path/to/debug.keystore bash scripts/build-apk.sh`
 
 Dirty Desktop worktrees fail the build (set `ALLOW_DIRTY_UI_CORE=1` only for local experiments).
 
