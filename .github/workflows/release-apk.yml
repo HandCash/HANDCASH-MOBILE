@@ -57,8 +57,8 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      # Android SDK comes from scripts/build-apk.sh (portable cmdline-tools).
+      # Do not use android-actions/setup-android — it still asks for obsolete `tools`.
 
       - name: Read release metadata
         id: meta
