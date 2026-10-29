@@ -28,22 +28,19 @@ bash scripts/build-apk.sh
 # → artifacts/ui-core-pin.json   (Desktop version + SHA baked into the release)
 ```
 
-### Mac vs Linux installs
+### Lab signing + key rotation
 
-Android refuses an APK when it is signed with a **different key** than the app already on the phone (`App not installed` with no detail). Debug builds use `~/.android/debug.keystore`, which is **different on every machine**.
+Android refuses an APK signed with a **different key** than the app already on the phone (`App not installed`). Lab builds share one keystore (CI secret / local file), and **rotate** with APK Signature Scheme v3 lineage — upgrades stay in place; you do not uninstall.
 
-**One-time setup (recommended):** on the Mac that already installs on your phone:
+- `native-android/lab-signing-lineage.bin` — committed lineage (old Mac/debug cert → current lab cert)
+- `HANDCASH_ANDROID_LAB_KEYSTORE_BASE64` — current lab keystore (secret)
+- `HANDCASH_ANDROID_LAB_OLD_KEYSTORE_BASE64` — previous key phones already trust (secret; required to dual-sign the rotate)
+- Local: current key at `native-android/handcash-lab.keystore`, previous at `~/.handcash/android-signing/handcash-lab-old.keystore`
 
 ```bash
-bash scripts/export-lab-keystore.sh
-# copies ~/.android/debug.keystore → native-android/handcash-lab.keystore (gitignored)
+bash scripts/export-lab-keystore.sh   # first-time: copy ~/.android/debug.keystore → lab keystore
+# After a rotate, keep the previous .keystore as handcash-lab-old — do not delete it.
 ```
-
-Keep that file **local only** — never commit it (this repo is public). For CI, store it as the private Actions secret `HANDCASH_ANDROID_LAB_KEYSTORE_BASE64`. scp the file to your Linux box for local builds. Rebuild — Linux APKs will upgrade Mac installs.
-
-**Quick test:** uninstall HandCash from the phone, then sideload the Linux APK.
-
-Or point at any keystore: `HANDCASH_ANDROID_LAB_KEYSTORE=/path/to/debug.keystore bash scripts/build-apk.sh`
 
 Dirty Desktop worktrees fail the build (set `ALLOW_DIRTY_UI_CORE=1` only for local experiments).
 

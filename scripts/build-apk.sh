@@ -102,38 +102,72 @@ node "$ROOT/scripts/patch-android.mjs"
 )
 
 MOBILE_VERSION="$(node -p "require('./package.json').version")"
+APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+signerFor() {
+  "$APKSIGNER" verify --print-certs --min-sdk-version "$1" --max-sdk-version "$2" "$3" 2>/dev/null \
+    | awk '/Signer #1 certificate SHA-256 digest:/ {print $NF}'
+}
+rotateApk() {
+  # APK Signature Scheme v3 lineage: in-place upgrade across key change.
+  # Android 6–8 keep the previous signer; Android 9+ trusts the next key via lineage.
+  local apk="$1" lineage="$2"
+  local old_ks="$3" old_alias="$4" old_store_env="$5" old_key_env="$6"
+  local next_ks="$7" next_alias="$8" next_pass="$9" old_sha="${10}" next_sha="${11}"
+  local rotated="${apk}.rotated"
+  [[ -f "$lineage" ]] || { echo "Missing signing lineage $lineage" >&2; exit 1; }
+  [[ -f "$old_ks" ]] || { echo "Previous keystore $old_ks not found — rotation needs the key phones already trust" >&2; exit 1; }
+  [[ -f "$next_ks" ]] || { echo "Next keystore $next_ks not found" >&2; exit 1; }
+  "$APKSIGNER" sign \
+    --ks "$old_ks" --ks-key-alias "$old_alias" \
+    --ks-pass "env:${old_store_env}" --key-pass "env:${old_key_env}" \
+    --next-signer --ks "$next_ks" --ks-key-alias "$next_alias" --ks-pass "pass:${next_pass}" \
+    --lineage "$lineage" --rotation-min-sdk-version 28 \
+    --out "$rotated" "$apk"
+  mv -f "$rotated" "$apk"
+  rm -f "${rotated}.idsig" "${apk}.idsig"
+  local got_old got_next
+  got_old="$(signerFor 23 27 "$apk")"
+  got_next="$(signerFor 28 35 "$apk")"
+  [[ "$got_old" == "$old_sha" ]] || { echo "Android 6-8 signer is ${got_old:-missing}, expected $old_sha" >&2; exit 1; }
+  [[ "$got_next" == "$next_sha" ]] || { echo "Android 9+ signer is ${got_next:-missing}, expected $next_sha" >&2; exit 1; }
+  echo "Rotated APK in place (lineage): Android 6-8=$got_old  Android 9+=$got_next"
+}
+
 if [[ "${HANDCASH_BUILD_TYPE:-release}" == "debug" ]]; then
   APK="$ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
+  # Lab rotate: previous Mac/debug cert → current lab cert. Lineage is committed;
+  # private keystores stay out of the public repo (CI secrets / ~/.handcash).
+  LAB_LINEAGE="$ROOT/native-android/lab-signing-lineage.bin"
+  LAB_OLD_KS="${HANDCASH_ANDROID_LAB_OLD_KEYSTORE:-$HOME/.handcash/android-signing/handcash-lab-old.keystore}"
+  LAB_NEW_KS="$ROOT/native-android/handcash-lab.keystore"
+  LAB_OLD_SHA="${HANDCASH_ANDROID_LAB_OLD_CERT_SHA256:-b6de8e22d0cf9bf4a01c0f60e004a98de8d1e9a1f611adaf9945b38498f64ec4}"
+  LAB_NEW_SHA="${HANDCASH_ANDROID_LAB_CERT_SHA256:-600442ea52cebd1b3d00037d19acb79d4e1ae0cf292e4cc2d21377ba38e847b8}"
+  if [[ -f "$LAB_LINEAGE" && -f "$LAB_OLD_KS" && -f "$LAB_NEW_KS" ]]; then
+    export HANDCASH_ANDROID_LAB_OLD_STORE_PASSWORD="${HANDCASH_ANDROID_LAB_OLD_STORE_PASSWORD:-android}"
+    export HANDCASH_ANDROID_LAB_OLD_KEY_PASSWORD="${HANDCASH_ANDROID_LAB_OLD_KEY_PASSWORD:-android}"
+    rotateApk "$APK" "$LAB_LINEAGE" \
+      "$LAB_OLD_KS" androiddebugkey HANDCASH_ANDROID_LAB_OLD_STORE_PASSWORD HANDCASH_ANDROID_LAB_OLD_KEY_PASSWORD \
+      "$LAB_NEW_KS" androiddebugkey android \
+      "$LAB_OLD_SHA" "$LAB_NEW_SHA"
+  elif [[ -f "$LAB_LINEAGE" ]]; then
+    echo "Lab lineage present but old keystore missing at $LAB_OLD_KS — APK will NOT upgrade installs signed with the previous key." >&2
+    echo "Restore handcash-lab-old.keystore (CI secret HANDCASH_ANDROID_LAB_OLD_KEYSTORE_BASE64) for real rotation." >&2
+  fi
 else
   APK="$ROOT/android/app/build/outputs/apk/release/app-release.apk"
-  APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
-  # Key rotation (APK Signature Scheme v3): Android 9+ trusts the release key
-  # through the lineage; older Android and v1/v2 keep the original signer, so
-  # every install updates in place. The release key never enters the repo.
+  # Production rotate: original release key → HandCash release key. Release key never enters the repo.
   LINEAGE="$ROOT/native-android/signing-lineage.bin"
   NEXT_KS="${HANDCASH_ANDROID_NEXT_KEYSTORE:-$HOME/.handcash/android-signing/handcash-release.p12}"
   NEXT_ALIAS="${HANDCASH_ANDROID_NEXT_KEY_ALIAS:-handcash-release}"
   NEXT_SHA="${HANDCASH_ANDROID_NEXT_CERT_SHA256:-4a0dae371b99461cc6db57c63d7105cb9ffde34d3bb6b3f4dbfaa148442d8c4e}"
-  [[ -f "$LINEAGE" ]] || { echo "Missing signing lineage $LINEAGE" >&2; exit 1; }
-  [[ -f "$NEXT_KS" ]] || { echo "Release key $NEXT_KS not found — restore it from backup" >&2; exit 1; }
   NEXT_PASS="${HANDCASH_ANDROID_NEXT_STORE_PASSWORD:-$(security find-generic-password -s handcash-android-release -a "$NEXT_ALIAS" -w 2>/dev/null || true)}"
   [[ -n "$NEXT_PASS" ]] || { echo "Release key password not in env or Keychain (handcash-android-release)" >&2; exit 1; }
-  ROTATED="$APK.rotated"
-  "$APKSIGNER" sign \
-    --ks "$HANDCASH_ANDROID_KEYSTORE" --ks-key-alias "$HANDCASH_ANDROID_KEY_ALIAS" \
-    --ks-pass "env:HANDCASH_ANDROID_STORE_PASSWORD" --key-pass "env:HANDCASH_ANDROID_KEY_PASSWORD" \
-    --next-signer --ks "$NEXT_KS" --ks-key-alias "$NEXT_ALIAS" --ks-pass "pass:$NEXT_PASS" \
-    --lineage "$LINEAGE" --rotation-min-sdk-version 28 \
-    --out "$ROTATED" "$APK"
-  mv -f "$ROTATED" "$APK"
-  rm -f "$ROTATED.idsig" "$APK.idsig"
-  signerFor() {
-    "$APKSIGNER" verify --print-certs --min-sdk-version "$1" --max-sdk-version "$2" "$APK" 2>/dev/null \
-      | awk '/Signer #1 certificate SHA-256 digest:/ {print $NF}'
-  }
+  : "${HANDCASH_ANDROID_KEY_PASSWORD:?Release requires key password}"
   expected=$(printf '%s' "$HANDCASH_ANDROID_CERT_SHA256" | tr -d ':' | tr '[:upper:]' '[:lower:]')
-  [[ "$(signerFor 23 27)" == "$expected" ]] || { echo "Android 6-8 signer is not the original certificate" >&2; exit 1; }
-  [[ "$(signerFor 28 35)" == "$NEXT_SHA" ]] || { echo "Android 9+ signer is not the rotated release certificate" >&2; exit 1; }
+  rotateApk "$APK" "$LINEAGE" \
+    "$HANDCASH_ANDROID_KEYSTORE" "$HANDCASH_ANDROID_KEY_ALIAS" HANDCASH_ANDROID_STORE_PASSWORD HANDCASH_ANDROID_KEY_PASSWORD \
+    "$NEXT_KS" "$NEXT_ALIAS" "$NEXT_PASS" \
+    "$expected" "$NEXT_SHA"
 fi
 mkdir -p "$ROOT/artifacts"
 OUT="$ROOT/artifacts/handcash-mobile-${MOBILE_VERSION}.apk"

@@ -81,17 +81,26 @@ jobs:
         working-directory: HANDCASH-DESKTOP
         run: npm ci
 
-      - name: Restore lab keystore from private secret
+      - name: Restore lab keystores from private secrets
         env:
           KEYSTORE_BASE64: ${{ secrets.HANDCASH_ANDROID_LAB_KEYSTORE_BASE64 }}
+          OLD_KEYSTORE_BASE64: ${{ secrets.HANDCASH_ANDROID_LAB_OLD_KEYSTORE_BASE64 }}
         run: |
           # Never commit *.keystore — this repo is public. Secret only.
+          # Current lab key + previous key (for APK Signature Scheme v3 lineage rotation).
           test -n "$KEYSTORE_BASE64" || {
             echo "Set Actions secret HANDCASH_ANDROID_LAB_KEYSTORE_BASE64 (base64 of handcash-lab.keystore)" >&2
             exit 1
           }
+          test -n "$OLD_KEYSTORE_BASE64" || {
+            echo "Set Actions secret HANDCASH_ANDROID_LAB_OLD_KEYSTORE_BASE64 (previous lab key — needed for in-place rotate)" >&2
+            exit 1
+          }
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > HANDCASH-MOBILE/native-android/handcash-lab.keystore
           chmod 600 HANDCASH-MOBILE/native-android/handcash-lab.keystore
+          mkdir -p "$HOME/.handcash/android-signing"
+          printf '%s' "$OLD_KEYSTORE_BASE64" | base64 --decode > "$HOME/.handcash/android-signing/handcash-lab-old.keystore"
+          chmod 600 "$HOME/.handcash/android-signing/handcash-lab-old.keystore"
 
       - name: Build APK
         working-directory: HANDCASH-MOBILE
@@ -100,8 +109,9 @@ jobs:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          bash scripts/build-apk.sh
+          # Default path in build-apk.sh; Restore step wrote the previous key here.
+          HANDCASH_ANDROID_LAB_OLD_KEYSTORE: /home/runner/.handcash/android-signing/handcash-lab-old.keystore
+        run: bash scripts/build-apk.sh
 
       - name: Ensure GitHub Release exists
         env:
