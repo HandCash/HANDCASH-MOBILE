@@ -123,11 +123,20 @@ assertAeonEngineFromDesktop()
  * an out-of-scope variable (`actionArgs is not defined` on every bounce
  * deposit) while every Desktop installer for the same core was refused.
  * The core is one tree — hold it to the same check here.
+ *
+ * Never `npx tsc` — that resolves the wrong npm package (`tsc@2.0.4`).
+ * Use Desktop's installed `typescript` binary (CI must `npm ci` there first).
  */
 function assertUiCoreTypechecks() {
-  console.info('[ui-core] typechecking Desktop UI core (tsc --noEmit)…')
+  const tscBin = path.join(desktopRoot, 'node_modules', 'typescript', 'bin', 'tsc')
+  if (!fs.existsSync(tscBin)) {
+    die(
+      `Desktop typescript missing at ${tscBin} — run npm ci in the Desktop checkout before the APK build.`,
+    )
+  }
+  console.info('[ui-core] typechecking Desktop UI core (typescript/bin/tsc --noEmit)…')
   try {
-    execSync('npx tsc -p tsconfig.json --noEmit', { cwd: desktopRoot, stdio: 'inherit' })
+    execSync(`"${tscBin}" -p tsconfig.json --noEmit`, { cwd: desktopRoot, stdio: 'inherit' })
   } catch {
     die('Desktop UI core does not typecheck — fix it there before building the APK.')
   }
