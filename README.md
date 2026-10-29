@@ -28,19 +28,24 @@ bash scripts/build-apk.sh
 # → artifacts/ui-core-pin.json   (Desktop version + SHA baked into the release)
 ```
 
-### Lab signing + key rotation
+### Production signing (users)
 
-Android refuses an APK signed with a **different key** than the app already on the phone (`App not installed`). Lab builds share one keystore (CI secret / local file), and **rotate** with APK Signature Scheme v3 lineage — upgrades stay in place; you do not uninstall.
+Shipped APKs must match the **0.1.764 install base**: APK Signature Scheme v3 lineage
 
-- `native-android/lab-signing-lineage.bin` — committed lineage (old Mac/debug cert → current lab cert)
-- `HANDCASH_ANDROID_LAB_KEYSTORE_BASE64` — current lab keystore (secret)
-- `HANDCASH_ANDROID_LAB_OLD_KEYSTORE_BASE64` — previous key phones already trust (secret; required to dual-sign the rotate)
-- Local: current key at `native-android/handcash-lab.keystore`, previous at `~/.handcash/android-signing/handcash-lab-old.keystore`
+`Mac/debug b6de…` → `HandCash Wallet 4a0dae…` (`native-android/signing-lineage.bin`).
+
+Lab/debug APKs **cannot** upgrade user installs. Do not ship them.
+
+**Before wiping the Mac that holds the release key:**
 
 ```bash
-bash scripts/export-lab-keystore.sh   # first-time: copy ~/.android/debug.keystore → lab keystore
-# After a rotate, keep the previous .keystore as handcash-lab-old — do not delete it.
+bash scripts/export-release-signing.sh
+# uploads parent + handcash-release.p12 (+ passwords) as Actions secrets
 ```
+
+Then tag — CI builds `assembleRelease`, dual-signs with lineage, uploads a **Latest** release. Android 9+ users on 0.1.764 upgrade in place.
+
+Local Linux release build needs the same files under `~/.handcash/android-signing/handcash-release.p12` and the parent keystore in `HANDCASH_ANDROID_*` env vars (see `scripts/build-apk.sh`).
 
 Dirty Desktop worktrees fail the build (set `ALLOW_DIRTY_UI_CORE=1` only for local experiments).
 

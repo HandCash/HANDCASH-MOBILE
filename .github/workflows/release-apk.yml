@@ -81,36 +81,44 @@ jobs:
         working-directory: HANDCASH-DESKTOP
         run: npm ci
 
-      - name: Restore lab keystores from private secrets
+      - name: Restore production signing keys
         env:
-          KEYSTORE_BASE64: ${{ secrets.HANDCASH_ANDROID_LAB_KEYSTORE_BASE64 }}
-          OLD_KEYSTORE_BASE64: ${{ secrets.HANDCASH_ANDROID_LAB_OLD_KEYSTORE_BASE64 }}
+          PARENT_BASE64: ${{ secrets.HANDCASH_ANDROID_KEYSTORE_BASE64 }}
+          NEXT_BASE64: ${{ secrets.HANDCASH_ANDROID_NEXT_KEYSTORE_BASE64 }}
         run: |
-          # Never commit *.keystore — this repo is public. Secret only.
-          # Current lab key + previous key (for APK Signature Scheme v3 lineage rotation).
-          test -n "$KEYSTORE_BASE64" || {
-            echo "Set Actions secret HANDCASH_ANDROID_LAB_KEYSTORE_BASE64 (base64 of handcash-lab.keystore)" >&2
+          # Production lineage (native-android/signing-lineage.bin):
+          #   parent Mac/debug b6de… → HandCash Wallet 4a0dae… (same as 0.1.764 users)
+          # Lab/debug APKs must never ship to users — they cannot upgrade that install base.
+          test -n "$PARENT_BASE64" || {
+            echo "Missing HANDCASH_ANDROID_KEYSTORE_BASE64 (lineage parent). On the Mac: bash scripts/export-release-signing.sh" >&2
             exit 1
           }
-          test -n "$OLD_KEYSTORE_BASE64" || {
-            echo "Set Actions secret HANDCASH_ANDROID_LAB_OLD_KEYSTORE_BASE64 (previous lab key — needed for in-place rotate)" >&2
+          test -n "$NEXT_BASE64" || {
+            echo "Missing HANDCASH_ANDROID_NEXT_KEYSTORE_BASE64 (handcash-release.p12). On the Mac: bash scripts/export-release-signing.sh" >&2
             exit 1
           }
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > HANDCASH-MOBILE/native-android/handcash-lab.keystore
-          chmod 600 HANDCASH-MOBILE/native-android/handcash-lab.keystore
+          printf '%s' "$PARENT_BASE64" | base64 --decode > "$RUNNER_TEMP/handcash-parent.keystore"
+          chmod 600 "$RUNNER_TEMP/handcash-parent.keystore"
           mkdir -p "$HOME/.handcash/android-signing"
-          printf '%s' "$OLD_KEYSTORE_BASE64" | base64 --decode > "$HOME/.handcash/android-signing/handcash-lab-old.keystore"
-          chmod 600 "$HOME/.handcash/android-signing/handcash-lab-old.keystore"
+          printf '%s' "$NEXT_BASE64" | base64 --decode > "$HOME/.handcash/android-signing/handcash-release.p12"
+          chmod 600 "$HOME/.handcash/android-signing/handcash-release.p12"
 
       - name: Build APK
         working-directory: HANDCASH-MOBILE
         env:
-          HANDCASH_BUILD_TYPE: debug
+          # Default HANDCASH_BUILD_TYPE=release → assembleRelease + v3 lineage rotate
+          HANDCASH_ANDROID_KEYSTORE: ${{ runner.temp }}/handcash-parent.keystore
+          HANDCASH_ANDROID_STORE_PASSWORD: ${{ secrets.HANDCASH_ANDROID_STORE_PASSWORD }}
+          HANDCASH_ANDROID_KEY_ALIAS: ${{ secrets.HANDCASH_ANDROID_KEY_ALIAS }}
+          HANDCASH_ANDROID_KEY_PASSWORD: ${{ secrets.HANDCASH_ANDROID_KEY_PASSWORD }}
+          HANDCASH_ANDROID_CERT_SHA256: ${{ secrets.HANDCASH_ANDROID_CERT_SHA256 }}
+          HANDCASH_ANDROID_NEXT_KEYSTORE: /home/runner/.handcash/android-signing/handcash-release.p12
+          HANDCASH_ANDROID_NEXT_STORE_PASSWORD: ${{ secrets.HANDCASH_ANDROID_NEXT_STORE_PASSWORD }}
+          HANDCASH_ANDROID_NEXT_KEY_ALIAS: ${{ secrets.HANDCASH_ANDROID_NEXT_KEY_ALIAS }}
+          HANDCASH_ANDROID_NEXT_CERT_SHA256: ${{ secrets.HANDCASH_ANDROID_NEXT_CERT_SHA256 }}
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Default path in build-apk.sh; Restore step wrote the previous key here.
-          HANDCASH_ANDROID_LAB_OLD_KEYSTORE: /home/runner/.handcash/android-signing/handcash-lab-old.keystore
         run: bash scripts/build-apk.sh
 
       - name: Ensure GitHub Release exists
@@ -124,8 +132,8 @@ jobs:
             gh release create "$TAG" \
               --repo "${{ github.repository }}" \
               --title "HandCash Mobile ${{ steps.meta.outputs.version }}" \
-              --notes "HandCash Mobile ${{ steps.meta.outputs.version }} APK built from CI and pinned to the Desktop UI core SHA." \
-              --prerelease \
+              --notes "HandCash Mobile ${{ steps.meta.outputs.version }} — production-signed APK (lineage matches 0.1.764: upgrades in place)." \
+              --latest \
               --target "${{ github.sha }}"
           fi
 
