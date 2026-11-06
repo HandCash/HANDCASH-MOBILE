@@ -4,6 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Reject an unpinned or dirty shared core before downloading tools or replacing
+# dependencies. A refused release must leave the existing build setup alone.
+node "$ROOT/scripts/assert-ui-core.mjs"
+
 JDK_ROOT="${JDK_ROOT:-$HOME/.local/jdk}"
 ANDROID_HOME="${ANDROID_HOME:-$HOME/.local/android-sdk}"
 export ANDROID_HOME
@@ -75,9 +79,6 @@ fi
   "platform-tools" "platforms;android-35" "build-tools;35.0.0" >/tmp/sdkmanager.log < <(yes)
 
 npm ci
-
-# Fail closed unless sibling Desktop UI core is pinned (version + git SHA).
-node "$ROOT/scripts/assert-ui-core.mjs"
 
 npm run build
 if [[ ! -d android ]]; then
