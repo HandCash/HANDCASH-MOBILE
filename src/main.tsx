@@ -7,6 +7,7 @@ import '@aeon-ui/panda/electron.css'
 import '@handcash/wallet-ui/styles/handcash.css'
 import '@handcash/wallet-ui/styles/layout-compact.css'
 import './mobile-overrides.css'
+import { installArgon2WorkerBackend } from '@handcash/wallet-ui/wallet/argon2WorkerBackend'
 import { installBackgroundRuntime } from './backgroundRuntime'
 import { drainNativeCrashReport } from './crashReportNative'
 import { App } from '@handcash/wallet-ui/App'
@@ -16,6 +17,7 @@ import { installCapacitorKeyboard } from './capacitorKeyboard'
 import { installDeepLinks } from './deepLinks'
 import { startMobileChromeTheme } from './mobileChromeTheme'
 
+installArgon2WorkerBackend()
 installBackgroundRuntime()
 void drainNativeCrashReport()
 
