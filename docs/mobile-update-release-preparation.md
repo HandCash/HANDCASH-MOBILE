@@ -1,5 +1,16 @@
 # Android update release preparation — 2026-11-07
 
+## Published with explicit approval
+
+The user explicitly approved shipping the receipt-less 0.1.777 candidate without
+waiting for Desktop. Published as public Latest on 2026-11-07T04:38:46Z:
+https://github.com/HandCash/HANDCASH-MOBILE/releases/tag/v0.1.777 .
+Tag target is bfb27bc43762150b15a52b97118a2e4a0d8fad54. All three public assets
+were downloaded anonymously and their SHA-256 digests verified. The actual
+Mobile release selector against the public feed offers 0.1.777 to 0.1.776 and
+no update to 0.1.777. No secrets were moved. Physical installation and usable
+pairing remain unverified; the pending signed-receipt fix is not included.
+
 ## Distribution verified
 
 The public, unauthenticated GitHub releases endpoint returned HTTP 200 and latest
@@ -70,10 +81,12 @@ APK hash and compatibility limits and obtain explicit approval to:
    existing update feed. No app-store upload, Desktop release, secret movement,
    default-branch push or additional build is covered by this scope.
 
-The existing release workflow rebuilds before publishing. To avoid a duplicate
-build, publish the verified artifact directly after exact approval, using the
-same tag/title/Latest and three-asset convention. A tag push triggers CI, so do
-not push a tag just to publish an already built artifact. Create the release/tag
-through GitHub's release API/CLI with the exact approved source target instead.
-No publication approval has been requested for the stale receipt-less candidate;
-no release, tag, default branch or secret was changed during this preparation.
+The original preparation above was superseded by explicit approval to publish
+this existing candidate without the receipt fix. The existing three verified
+artifacts were uploaded to a draft, then published as Latest without rebuilding
+locally. Creating the release tag via GitHub also triggered tag workflow
+42339351872 unexpectedly; it was cancelled while Build APK was running,
+and both publication steps were confirmed skipped. The published asset digests
+still match the approved originals. Do not assume API-created release tags avoid
+push-triggered workflows. Future artifact reuse needs an explicit, tested
+skip-build path or suppression of that trigger before tag creation.
