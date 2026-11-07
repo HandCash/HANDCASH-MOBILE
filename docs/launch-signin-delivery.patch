@@ -1,0 +1,26 @@
+diff --git a/src/wallet/scanLogin/approvals.ts b/src/wallet/scanLogin/approvals.ts
+--- a/src/wallet/scanLogin/approvals.ts
++++ b/src/wallet/scanLogin/approvals.ts
+@@ -1 +1 @@
+-      return { ...base, title: `Signed in on ${label}`, detail: 'Approved here', live: false }
++      return { ...base, title: `Wallet sent to ${label}`, detail: 'Open it there to finish sign-in', live: false }
+diff --git a/src/wallet/scanLogin/scanLogin.test.ts b/src/wallet/scanLogin/scanLogin.test.ts
+--- a/src/wallet/scanLogin/scanLogin.test.ts
++++ b/src/wallet/scanLogin/scanLogin.test.ts
+@@ -1 +1 @@
+-    expect(listScanLoginRows()[0]).toMatchObject({ face: 'approved', title: 'Signed in on Windows PC' })
++    expect(listScanLoginRows()[0]).toMatchObject({ face: 'approved', title: 'Wallet sent to Windows PC', detail: 'Open it there to finish sign-in' })
+diff --git a/src/wallet/deviceSignin/view.ts b/src/wallet/deviceSignin/view.ts
+--- a/src/wallet/deviceSignin/view.ts
++++ b/src/wallet/deviceSignin/view.ts
+@@ -1,2 +1,2 @@
+-        title: `Signed in on ${request.label}`,
+-        detail: request.approverLabel ? `Approved on ${request.approverLabel}` : 'Approved',
++        title: request.state === 'received' ? `Wallet saved on ${request.label}` : `Wallet sent to ${request.label}`,
++        detail: 'Open it there to finish sign-in',
+diff --git a/src/wallet/deviceSignin/deviceSignin.test.ts b/src/wallet/deviceSignin/deviceSignin.test.ts
+--- a/src/wallet/deviceSignin/deviceSignin.test.ts
++++ b/src/wallet/deviceSignin/deviceSignin.test.ts
+@@ -1 +1 @@
+-      face: 'approved', title: 'Signed in on Windows PC', detail: 'Approved on Mac', live: false,
++      face: 'approved', title: 'Wallet saved on Windows PC', detail: 'Open it there to finish sign-in', live: false,
