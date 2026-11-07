@@ -10,6 +10,11 @@ on:
         description: 'Git tag to build and upload (for example: v0.1.254). Leave blank to use the package version.'
         required: false
         type: string
+      publish:
+        description: 'Publish or replace GitHub Release assets (requires release approval).'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -121,7 +126,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/build-apk.sh
 
+      - name: Keep signed APK and provenance as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: handcash-mobile-${{ steps.meta.outputs.version }}
+          path: |
+            HANDCASH-MOBILE/artifacts/*.apk
+            HANDCASH-MOBILE/artifacts/*.sha256
+            HANDCASH-MOBILE/artifacts/*.ui-core-pin.json
+          if-no-files-found: error
+
       - name: Ensure GitHub Release exists
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || inputs.publish == true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -138,6 +154,7 @@ jobs:
           fi
 
       - name: Upload APK and metadata
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || inputs.publish == true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         working-directory: HANDCASH-MOBILE
