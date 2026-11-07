@@ -38,6 +38,28 @@ describe('selectMobileRelease', () => {
     })
   })
 
+  it('offers the prepared Android update only after release publication and APK attachment', () => {
+    const prepared = {
+      tag_name: 'v0.1.777',
+      draft: true,
+      published_at: null as string | null,
+      html_url: 'https://github.com/HandCash/HANDCASH-MOBILE/releases/tag/v0.1.777',
+      assets: [{
+        name: 'handcash-mobile-0.1.777.apk',
+        browser_download_url: 'https://github.com/HandCash/HANDCASH-MOBILE/releases/download/v0.1.777/handcash-mobile-0.1.777.apk',
+      }],
+    }
+    assert.equal(selectMobileRelease([prepared], '0.1.776'), null)
+    const published = { ...prepared, draft: false, published_at: '2026-11-07T00:00:00Z' }
+    assert.equal(selectMobileRelease([{ ...published, assets: [] }], '0.1.776'), null)
+    assert.deepEqual(selectMobileRelease([published], '0.1.776'), {
+      version: '0.1.777',
+      apkUrl: published.assets[0]!.browser_download_url,
+      releaseUrl: published.html_url,
+    })
+    assert.equal(selectMobileRelease([published], '0.1.777'), null)
+  })
+
   it('does not offer the current or an older release', () => {
     assert.equal(selectMobileRelease(releases, '0.1.310'), null)
     assert.equal(selectMobileRelease(releases, '0.2.0'), null)

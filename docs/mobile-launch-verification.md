@@ -24,7 +24,7 @@ Pinned Desktop typecheck passed. Focused shared suites: 89 passing tests across 
 
 The shared approver still displays `Signed in on …` after an HTTP vault-delivery acknowledgment, before the receiving device saves or boots the wallet. Email relay also labels both `sent` and `received` as signed in. Mobile's external-file protection refused changes to those Desktop files; no bypass was attempted. `launch-signin-delivery.patch` contains a minimal truthful-copy correction and adjusted assertions for the Desktop owner. It does not add a usable-session receipt or prove receiver boot success.
 
-The selected core is now available remotely on the temporary build branch. Desktop still owns applying and verifying the delivery-label correction and providing its next committed pin; Mobile only consumes committed shared core.
+The selected core is now available remotely on the temporary build branch. Superseding the copy-only handoff, the canonical Desktop working tree now contains a signed usable-session receipt protocol and runtime acknowledgment changes, still uncommitted and absent from this APK. Its focused protocol/chart/peer tests pass (47); do not package that dirty tree or apply the earlier copy patch over it. Desktop must provide the isolated committed receipt-capable pin. See [update release preparation](mobile-update-release-preparation.md) for the normal phone update route and exact publication gate.
 
 The build branch's APK workflow supports manual artifact-only builds (`publish: false`, the default). This path was successfully used for run 42336112118. Tag pushes retain existing publishing behavior; manual `publish: true` explicitly publishes. No signing blocker remains for this APK.
 

@@ -49,6 +49,26 @@ Local Linux release build needs the same files under `~/.handcash/android-signin
 
 Dirty Desktop worktrees fail the build (set `ALLOW_DIRTY_UI_CORE=1` only for local experiments).
 
+### Installed Android updates
+
+The normal distribution route is a published GitHub Release with its production-signed
+`handcash-mobile-<version>.apk`, checksum and UI-core provenance. Actions artifacts
+alone are not visible to installed phones. Publication requires explicit approval;
+reuse the verified signed artifact rather than rebuilding it just to publish.
+
+With Settings → Updates set to Automatic, the app checks four seconds after startup
+and every four hours while running. For an immediate check, use Settings → Check
+update (Manual mode also allows this; Off disables checks). Tap Download in the
+update notice. HandCash opens the APK in the system browser/download manager;
+open the completed download and confirm Android's update installer, then reopen
+HandCash. Android may require allowing installs from that browser. This is not a
+silent install or an app-store update. Keep the existing app installed: production
+signing lineage is intended to update it in place without deleting its wallet data.
+Do not uninstall to resolve a signer mismatch.
+
+See [current release preparation](docs/mobile-update-release-preparation.md) for
+candidate verification and the pending shared pairing handoff.
+
 ## iOS (TestFlight)
 
 Same shell, second native platform: `ios/` is generated and gitignored like
