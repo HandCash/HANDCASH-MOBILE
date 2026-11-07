@@ -8,6 +8,15 @@ cd "$ROOT"
 # dependencies. A refused release must leave the existing build setup alone.
 node "$ROOT/scripts/assert-ui-core.mjs"
 
+# Refuse an unsigned release before downloading tools or replacing dependencies.
+if [[ "${HANDCASH_BUILD_TYPE:-release}" != "debug" ]]; then
+  : "${HANDCASH_ANDROID_KEYSTORE:?Release requires the stable private signing keystore}"
+  : "${HANDCASH_ANDROID_STORE_PASSWORD:?Release requires store password}"
+  : "${HANDCASH_ANDROID_KEY_ALIAS:?Release requires key alias}"
+  : "${HANDCASH_ANDROID_KEY_PASSWORD:?Release requires key password}"
+  : "${HANDCASH_ANDROID_CERT_SHA256:?Release requires the expected signer certificate fingerprint}"
+fi
+
 JDK_ROOT="${JDK_ROOT:-$HOME/.local/jdk}"
 ANDROID_HOME="${ANDROID_HOME:-$HOME/.local/android-sdk}"
 export ANDROID_HOME
@@ -93,11 +102,6 @@ node "$ROOT/scripts/patch-android.mjs"
   if [[ "${HANDCASH_BUILD_TYPE:-release}" == "debug" ]]; then
     ./gradlew assembleDebug
   else
-    : "${HANDCASH_ANDROID_KEYSTORE:?Release requires the stable private signing keystore}"
-    : "${HANDCASH_ANDROID_STORE_PASSWORD:?Release requires store password}"
-    : "${HANDCASH_ANDROID_KEY_ALIAS:?Release requires key alias}"
-    : "${HANDCASH_ANDROID_KEY_PASSWORD:?Release requires key password}"
-    : "${HANDCASH_ANDROID_CERT_SHA256:?Release requires the expected signer certificate fingerprint}"
     ./gradlew assembleRelease
   fi
 )
