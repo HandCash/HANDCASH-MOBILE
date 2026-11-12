@@ -40,6 +40,14 @@ function patchManifest(src) {
       `<manifest$1>\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />`,
     )
   }
+  // Calls: Capacitor's WebChromeClient asks for RECORD_AUDIO and
+  // MODIFY_AUDIO_SETTINGS on every mic request; undeclared, Android denies it.
+  if (!m.includes('android.permission.RECORD_AUDIO')) {
+    m = m.replace(
+      /(<uses-permission android:name="android.permission.CAMERA" \/>)/,
+      `$1\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />`,
+    )
+  }
   if (!m.includes('USE_BIOMETRIC')) {
     m = m.replace(
       /(<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" \/>)/,
