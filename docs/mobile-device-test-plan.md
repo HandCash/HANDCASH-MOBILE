@@ -2,7 +2,9 @@
 
 Task b32b4b93-61fc-4207-bafa-896def434d15. Companion to `docs/migration-verification-matrix.md`, which defines checks E1–E9 and the evidence fields. This file gives the device steps, adb commands, expected results and what to record.
 
-Status: plan only. Nothing here has been run. No device is connected and adb is not installed on this machine.
+Status: plan only. Nothing here has been run. On 2026-11-18, adb is still absent and no device has been verified available. Candidate selection remains blocked; see the matrix readiness recheck.
+
+Safety correction: the adb install/uninstall commands below are historical proposals, not authorization or the approved update route. Use release discovery → Download → Android installer for the exact approved signed artifact. Do not uninstall or reset an existing wallet: E1 needs a named disposable device/profile and explicit destructive-reset approval if required. Device inspection/log access also needs scoped approval. Do not capture raw logs to disk and then search for secrets; use an approved secret-safe diagnostic source instead. Real account export, including E4–E8 where applicable, needs wallet-data approval even when no funds move. E9 additionally needs funds approval.
 
 ## Approvals and stop conditions
 
